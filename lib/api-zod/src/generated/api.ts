@@ -541,5 +541,6 @@ export const GetDashboardStatsResponse = zod.object({
   activeInternetSubscriptions: zod.number(),
   totalCustomers: zod.number(),
   monthlyInstallmentIncome: zod.number(),
+  monthlyPendingAmount: zod.number(),
   monthlyCommunalIncome: zod.number(),
 });

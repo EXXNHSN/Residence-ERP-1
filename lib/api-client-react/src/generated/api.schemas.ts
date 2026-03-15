@@ -338,6 +338,7 @@ export interface DashboardStats {
   activeInternetSubscriptions: number;
   totalCustomers: number;
   monthlyInstallmentIncome: number;
+  monthlyPendingAmount: number;
   monthlyCommunalIncome: number;
 }
 

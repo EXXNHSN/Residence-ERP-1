@@ -40,8 +40,8 @@ export default function Dashboard() {
       bg: "bg-emerald-100/50",
     },
     {
-      title: "Aylıq Ödəniş Gözləntisi",
-      value: stats ? formatCurrency(stats.monthlyInstallmentIncome) : "0",
+      title: "Bu Ayın Gözlənilən Ödənişi",
+      value: stats ? formatCurrency(stats.monthlyPendingAmount) : "0",
       icon: TrendingUp,
       color: "text-blue-600",
       bg: "bg-blue-100/50",

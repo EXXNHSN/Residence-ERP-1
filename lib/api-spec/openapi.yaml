@@ -1213,6 +1213,8 @@ components:
           type: integer
         monthlyInstallmentIncome:
           type: number
+        monthlyPendingAmount:
+          type: number
         monthlyCommunalIncome:
           type: number
       required:
@@ -1235,4 +1237,5 @@ components:
         - activeInternetSubscriptions
         - totalCustomers
         - monthlyInstallmentIncome
+        - monthlyPendingAmount
         - monthlyCommunalIncome

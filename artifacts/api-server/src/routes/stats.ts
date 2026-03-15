@@ -65,6 +65,16 @@ router.get("/summary", async (_req, res) => {
     )
     .reduce((sum, i) => sum + Number(i.amount), 0);
 
+  // Bu ayın gözlənilən ödənişləri (hələ ödənilməyənlər)
+  const monthlyPendingAmount = allInstallments
+    .filter(
+      (i) =>
+        (i.status === "pending" || i.status === "overdue") &&
+        new Date(i.dueDate).getMonth() === now.getMonth() &&
+        new Date(i.dueDate).getFullYear() === now.getFullYear()
+    )
+    .reduce((sum, i) => sum + Number(i.amount), 0);
+
   const allRentals = await db.select().from(rentalsTable);
   const activeRentals = allRentals.filter((r) => r.status === "active").length;
 
@@ -105,6 +115,7 @@ router.get("/summary", async (_req, res) => {
     activeInternetSubscriptions,
     totalCustomers: customerCount.count,
     monthlyInstallmentIncome: Math.round(paidThisMonth * 100) / 100,
+    monthlyPendingAmount: Math.round(monthlyPendingAmount * 100) / 100,
     monthlyCommunalIncome: Math.round(paidCommunalThisMonth * 100) / 100,
   });
 });
