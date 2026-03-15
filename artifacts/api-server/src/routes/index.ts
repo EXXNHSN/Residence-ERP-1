@@ -1,8 +1,30 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import blocksRouter from "./blocks";
+import apartmentsRouter from "./apartments";
+import objectsRouter from "./objects";
+import customersRouter from "./customers";
+import salesRouter from "./sales";
+import installmentsRouter from "./installments";
+import rentalsRouter from "./rentals";
+import communalRouter from "./communal";
+import internetRouter from "./internet";
+import tariffsRouter from "./tariffs";
+import statsRouter from "./stats";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/blocks", blocksRouter);
+router.use("/apartments", apartmentsRouter);
+router.use("/objects", objectsRouter);
+router.use("/customers", customersRouter);
+router.use("/sales", salesRouter);
+router.use("/installments", installmentsRouter);
+router.use("/rentals", rentalsRouter);
+router.use("/communal", communalRouter);
+router.use("/internet", internetRouter);
+router.use("/tariffs", tariffsRouter);
+router.use("/stats", statsRouter);
 
 export default router;

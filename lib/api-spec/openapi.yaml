@@ -1,22 +1,43 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Naxchivan Residence ERP API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: blocks
+    description: Block management
+  - name: apartments
+    description: Apartment management
+  - name: objects
+    description: Objects and garages management
+  - name: customers
+    description: Customer management
+  - name: sales
+    description: Sales management
+  - name: installments
+    description: Installment schedule management
+  - name: rentals
+    description: Rental management
+  - name: communal
+    description: Communal billing
+  - name: internet
+    description: Internet subscription management
+  - name: tariffs
+    description: Tariff management
+  - name: stats
+    description: Statistics and reports
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +45,563 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /blocks:
+    get:
+      operationId: listBlocks
+      tags: [blocks]
+      summary: List all blocks
+      responses:
+        "200":
+          description: List of blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Block"
+    post:
+      operationId: createBlock
+      tags: [blocks]
+      summary: Create a block
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBlockInput"
+      responses:
+        "201":
+          description: Created block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Block"
+
+  /apartments:
+    get:
+      operationId: listApartments
+      tags: [apartments]
+      summary: List all apartments
+      parameters:
+        - name: blockId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ApartmentStatus"
+      responses:
+        "200":
+          description: List of apartments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Apartment"
+    post:
+      operationId: createApartment
+      tags: [apartments]
+      summary: Create an apartment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApartmentInput"
+      responses:
+        "201":
+          description: Created apartment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Apartment"
+
+  /apartments/{id}:
+    get:
+      operationId: getApartment
+      tags: [apartments]
+      summary: Get apartment by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Apartment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Apartment"
+
+  /objects:
+    get:
+      operationId: listObjects
+      tags: [objects]
+      summary: List all objects and garages
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ObjectType"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ObjectStatus"
+      responses:
+        "200":
+          description: List of objects/garages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ObjectGarage"
+    post:
+      operationId: createObject
+      tags: [objects]
+      summary: Create an object or garage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateObjectInput"
+      responses:
+        "201":
+          description: Created object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectGarage"
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List all customers
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create a customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerInput"
+      responses:
+        "201":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Customer details with sales
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerDetail"
+
+  /sales:
+    get:
+      operationId: listSales
+      tags: [sales]
+      summary: List all sales
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: integer
+        - name: saleType
+          in: query
+          schema:
+            $ref: "#/components/schemas/SaleType"
+      responses:
+        "200":
+          description: List of sales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sale"
+    post:
+      operationId: createSale
+      tags: [sales]
+      summary: Create a sale and generate installment schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSaleInput"
+      responses:
+        "201":
+          description: Created sale with installment schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleDetail"
+
+  /sales/{id}:
+    get:
+      operationId: getSale
+      tags: [sales]
+      summary: Get sale details with installments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sale details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleDetail"
+
+  /sales/calculate:
+    post:
+      operationId: calculateInstallment
+      tags: [sales]
+      summary: Calculate monthly installment amount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateInput"
+      responses:
+        "200":
+          description: Calculation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculationResult"
+
+  /installments:
+    get:
+      operationId: listInstallments
+      tags: [installments]
+      summary: List installments
+      parameters:
+        - name: saleId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+        - name: overdue
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of installments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Installment"
+
+  /installments/{id}/pay:
+    post:
+      operationId: payInstallment
+      tags: [installments]
+      summary: Mark an installment as paid
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayInstallmentInput"
+      responses:
+        "200":
+          description: Updated installment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Installment"
+
+  /rentals:
+    get:
+      operationId: listRentals
+      tags: [rentals]
+      summary: List all rentals
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/RentalStatus"
+      responses:
+        "200":
+          description: List of rentals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rental"
+    post:
+      operationId: createRental
+      tags: [rentals]
+      summary: Create a rental agreement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRentalInput"
+      responses:
+        "201":
+          description: Created rental
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rental"
+
+  /rentals/{id}:
+    put:
+      operationId: updateRental
+      tags: [rentals]
+      summary: Update rental (end/terminate)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRentalInput"
+      responses:
+        "200":
+          description: Updated rental
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rental"
+
+  /communal:
+    get:
+      operationId: listCommunalBills
+      tags: [communal]
+      summary: List communal bills
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+      responses:
+        "200":
+          description: List of communal bills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommunalBill"
+    post:
+      operationId: generateCommunalBills
+      tags: [communal]
+      summary: Generate communal bills for a given month
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateBillsInput"
+      responses:
+        "201":
+          description: Generated bills
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommunalBill"
+                required:
+                  - count
+                  - bills
+
+  /communal/{id}/pay:
+    post:
+      operationId: payCommunalBill
+      tags: [communal]
+      summary: Pay a communal bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommunalBill"
+
+  /internet:
+    get:
+      operationId: listInternetSubscriptions
+      tags: [internet]
+      summary: List internet subscriptions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/InternetStatus"
+      responses:
+        "200":
+          description: List of subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InternetSubscription"
+    post:
+      operationId: createInternetSubscription
+      tags: [internet]
+      summary: Create an internet subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInternetInput"
+      responses:
+        "201":
+          description: Created subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternetSubscription"
+
+  /internet/{id}/pay:
+    post:
+      operationId: payInternetBill
+      tags: [internet]
+      summary: Pay internet bill / renew subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternetSubscription"
+
+  /tariffs:
+    get:
+      operationId: listTariffs
+      tags: [tariffs]
+      summary: List tariffs
+      responses:
+        "200":
+          description: Current tariffs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TariffsResponse"
+    put:
+      operationId: updateTariffs
+      tags: [tariffs]
+      summary: Update tariffs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTariffsInput"
+      responses:
+        "200":
+          description: Updated tariffs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TariffsResponse"
+
+  /stats/summary:
+    get:
+      operationId: getDashboardStats
+      tags: [stats]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +612,627 @@ components:
       required:
         - status
 
+    ApartmentStatus:
+      type: string
+      enum: [available, sold, reserved]
+
+    ObjectType:
+      type: string
+      enum: [object, garage]
+
+    ObjectStatus:
+      type: string
+      enum: [available, sold, rented]
+
+    SaleType:
+      type: string
+      enum: [cash, credit]
+
+    PaymentStatus:
+      type: string
+      enum: [pending, paid, overdue]
+
+    RentalStatus:
+      type: string
+      enum: [active, ended]
+
+    InternetStatus:
+      type: string
+      enum: [active, expired, cancelled]
+
+    Block:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        apartmentCount:
+          type: integer
+      required:
+        - id
+        - name
+        - apartmentCount
+
+    CreateBlockInput:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+
+    Apartment:
+      type: object
+      properties:
+        id:
+          type: integer
+        blockId:
+          type: integer
+        blockName:
+          type: string
+        number:
+          type: string
+        floor:
+          type: integer
+        area:
+          type: number
+        status:
+          $ref: "#/components/schemas/ApartmentStatus"
+        pricePerSqm:
+          type: number
+        totalPrice:
+          type: number
+      required:
+        - id
+        - blockId
+        - blockName
+        - number
+        - floor
+        - area
+        - status
+
+    CreateApartmentInput:
+      type: object
+      properties:
+        blockId:
+          type: integer
+        number:
+          type: string
+        floor:
+          type: integer
+        area:
+          type: number
+      required:
+        - blockId
+        - number
+        - floor
+        - area
+
+    ObjectGarage:
+      type: object
+      properties:
+        id:
+          type: integer
+        number:
+          type: string
+        area:
+          type: number
+        type:
+          $ref: "#/components/schemas/ObjectType"
+        status:
+          $ref: "#/components/schemas/ObjectStatus"
+        pricePerSqm:
+          type: number
+        totalPrice:
+          type: number
+      required:
+        - id
+        - number
+        - area
+        - type
+        - status
+
+    CreateObjectInput:
+      type: object
+      properties:
+        number:
+          type: string
+        area:
+          type: number
+        type:
+          $ref: "#/components/schemas/ObjectType"
+      required:
+        - number
+        - area
+        - type
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        fin:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+      required:
+        - id
+        - firstName
+        - lastName
+        - phone
+
+    CreateCustomerInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        fin:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+      required:
+        - firstName
+        - lastName
+        - phone
+
+    CustomerDetail:
+      allOf:
+        - $ref: "#/components/schemas/Customer"
+        - type: object
+          properties:
+            sales:
+              type: array
+              items:
+                $ref: "#/components/schemas/Sale"
+          required:
+            - sales
+
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        assetType:
+          type: string
+          enum: [apartment, object, garage]
+        assetId:
+          type: integer
+        assetDescription:
+          type: string
+        saleType:
+          $ref: "#/components/schemas/SaleType"
+        totalAmount:
+          type: number
+        downPayment:
+          type: number
+        installmentMonths:
+          type: integer
+        monthlyPayment:
+          type: number
+        paidAmount:
+          type: number
+        remainingAmount:
+          type: number
+        saleDate:
+          type: string
+        progressPercent:
+          type: number
+      required:
+        - id
+        - customerId
+        - customerName
+        - assetType
+        - assetId
+        - assetDescription
+        - saleType
+        - totalAmount
+        - downPayment
+        - installmentMonths
+        - monthlyPayment
+        - paidAmount
+        - remainingAmount
+        - saleDate
+        - progressPercent
+
+    SaleDetail:
+      allOf:
+        - $ref: "#/components/schemas/Sale"
+        - type: object
+          properties:
+            installments:
+              type: array
+              items:
+                $ref: "#/components/schemas/Installment"
+          required:
+            - installments
+
+    CreateSaleInput:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        assetType:
+          type: string
+          enum: [apartment, object, garage]
+        assetId:
+          type: integer
+        saleType:
+          $ref: "#/components/schemas/SaleType"
+        downPayment:
+          type: number
+        installmentMonths:
+          type: integer
+        pricePerSqm:
+          type: number
+      required:
+        - customerId
+        - assetType
+        - assetId
+        - saleType
+        - downPayment
+        - pricePerSqm
+
+    CalculateInput:
+      type: object
+      properties:
+        area:
+          type: number
+        pricePerSqm:
+          type: number
+        downPayment:
+          type: number
+        installmentMonths:
+          type: integer
+      required:
+        - area
+        - pricePerSqm
+        - downPayment
+        - installmentMonths
+
+    CalculationResult:
+      type: object
+      properties:
+        totalAmount:
+          type: number
+        downPayment:
+          type: number
+        creditAmount:
+          type: number
+        monthlyPayment:
+          type: number
+        installmentMonths:
+          type: integer
+      required:
+        - totalAmount
+        - downPayment
+        - creditAmount
+        - monthlyPayment
+        - installmentMonths
+
+    Installment:
+      type: object
+      properties:
+        id:
+          type: integer
+        saleId:
+          type: integer
+        dueDate:
+          type: string
+        amount:
+          type: number
+        paidDate:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        installmentNumber:
+          type: integer
+      required:
+        - id
+        - saleId
+        - dueDate
+        - amount
+        - status
+        - installmentNumber
+
+    PayInstallmentInput:
+      type: object
+      properties:
+        paidDate:
+          type: string
+      required:
+        - paidDate
+
+    Rental:
+      type: object
+      properties:
+        id:
+          type: integer
+        assetType:
+          type: string
+          enum: [object, garage]
+        assetId:
+          type: integer
+        assetDescription:
+          type: string
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        monthlyAmount:
+          type: number
+        status:
+          $ref: "#/components/schemas/RentalStatus"
+        daysRemaining:
+          type: integer
+      required:
+        - id
+        - assetType
+        - assetId
+        - assetDescription
+        - customerId
+        - customerName
+        - startDate
+        - endDate
+        - monthlyAmount
+        - status
+        - daysRemaining
+
+    CreateRentalInput:
+      type: object
+      properties:
+        assetType:
+          type: string
+          enum: [object, garage]
+        assetId:
+          type: integer
+        customerId:
+          type: integer
+        startDate:
+          type: string
+        endDate:
+          type: string
+        monthlyAmount:
+          type: number
+      required:
+        - assetType
+        - assetId
+        - customerId
+        - startDate
+        - endDate
+        - monthlyAmount
+
+    UpdateRentalInput:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/RentalStatus"
+        endDate:
+          type: string
+
+    CommunalBill:
+      type: object
+      properties:
+        id:
+          type: integer
+        assetType:
+          type: string
+        assetId:
+          type: integer
+        assetDescription:
+          type: string
+        ownerName:
+          type: string
+        month:
+          type: integer
+        year:
+          type: integer
+        area:
+          type: number
+        tariff:
+          type: number
+        amount:
+          type: number
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        paidDate:
+          type: string
+          nullable: true
+      required:
+        - id
+        - assetType
+        - assetId
+        - assetDescription
+        - ownerName
+        - month
+        - year
+        - area
+        - tariff
+        - amount
+        - status
+
+    GenerateBillsInput:
+      type: object
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+      required:
+        - month
+        - year
+
+    InternetSubscription:
+      type: object
+      properties:
+        id:
+          type: integer
+        assetType:
+          type: string
+        assetId:
+          type: integer
+        assetDescription:
+          type: string
+        ownerName:
+          type: string
+        packageName:
+          type: string
+        monthlyPrice:
+          type: number
+        startDate:
+          type: string
+        expiryDate:
+          type: string
+        status:
+          $ref: "#/components/schemas/InternetStatus"
+        daysRemaining:
+          type: integer
+      required:
+        - id
+        - assetType
+        - assetId
+        - assetDescription
+        - ownerName
+        - packageName
+        - monthlyPrice
+        - startDate
+        - expiryDate
+        - status
+        - daysRemaining
+
+    CreateInternetInput:
+      type: object
+      properties:
+        assetType:
+          type: string
+          enum: [apartment, object, garage]
+        assetId:
+          type: integer
+        customerId:
+          type: integer
+        packageName:
+          type: string
+        monthlyPrice:
+          type: number
+        startDate:
+          type: string
+      required:
+        - assetType
+        - assetId
+        - customerId
+        - packageName
+        - monthlyPrice
+        - startDate
+
+    TariffsResponse:
+      type: object
+      properties:
+        communalTariff:
+          type: number
+        apartmentPricePerSqm:
+          type: number
+        objectPricePerSqm:
+          type: number
+        garagePricePerSqm:
+          type: number
+      required:
+        - communalTariff
+        - apartmentPricePerSqm
+        - objectPricePerSqm
+        - garagePricePerSqm
+
+    UpdateTariffsInput:
+      type: object
+      properties:
+        communalTariff:
+          type: number
+        apartmentPricePerSqm:
+          type: number
+        objectPricePerSqm:
+          type: number
+        garagePricePerSqm:
+          type: number
+
+    DashboardStats:
+      type: object
+      properties:
+        totalApartments:
+          type: integer
+        soldApartments:
+          type: integer
+        availableApartments:
+          type: integer
+        reservedApartments:
+          type: integer
+        totalObjects:
+          type: integer
+        availableObjects:
+          type: integer
+        totalGarages:
+          type: integer
+        availableGarages:
+          type: integer
+        totalSales:
+          type: integer
+        cashSales:
+          type: integer
+        creditSales:
+          type: integer
+        totalRevenue:
+          type: number
+        pendingInstallments:
+          type: integer
+        overdueInstallments:
+          type: integer
+        activeRentals:
+          type: integer
+        pendingCommunalBills:
+          type: integer
+        activeInternetSubscriptions:
+          type: integer
+        totalCustomers:
+          type: integer
+        monthlyInstallmentIncome:
+          type: number
+        monthlyCommunalIncome:
+          type: number
+      required:
+        - totalApartments
+        - soldApartments
+        - availableApartments
+        - reservedApartments
+        - totalObjects
+        - availableObjects
+        - totalGarages
+        - availableGarages
+        - totalSales
+        - cashSales
+        - creditSales
+        - totalRevenue
+        - pendingInstallments
+        - overdueInstallments
+        - activeRentals
+        - pendingCommunalBills
+        - activeInternetSubscriptions
+        - totalCustomers
+        - monthlyInstallmentIncome
+        - monthlyCommunalIncome

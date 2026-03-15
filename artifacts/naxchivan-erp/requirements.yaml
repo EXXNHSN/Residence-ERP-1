@@ -1,0 +1,22 @@
+packages:
+  "framer-motion": "For page transitions and smooth UI animations"
+  "recharts": "For dashboard charts and data visualization"
+  "date-fns": "For formatting dates in Azerbaijani locale"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility function to efficiently merge Tailwind CSS classes"
+  "react-hook-form": "For form state management and validation"
+  "@hookform/resolvers": "Zod resolver for react-hook-form"
+
+images:
+  - path: "artifacts/naxchivan-erp/public/images/logo-icon.png"
+    description: "A minimal, modern geometric logo icon suitable for a luxury real estate or property management ERP system. Solid white or light blue shapes on transparent background."
+    aspect_ratio: "1:1"
+  - path: "artifacts/naxchivan-erp/public/images/auth-bg.png"
+    description: "Abstract, elegant dark architectural background. Subtle lines of a modern building, deep indigo and slate colors, highly professional and corporate."
+    aspect_ratio: "16:9"
+
+notes:
+  - Using generated API client from @workspace/api-client-react
+  - Assuming standard shadcn/ui components exist in src/components/ui/
+  - Implementing Azerbaijani translations for all UI labels
+  - Design direction: Professional enterprise SaaS with a dark sidebar and clean light data tables
