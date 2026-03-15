@@ -70,6 +70,7 @@ export default function InstallmentsPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-20">ID</TableHead>
                   <TableHead>Satış ID</TableHead>
+                  <TableHead>Müştəri</TableHead>
                   <TableHead>Növbə</TableHead>
                   <TableHead>Tarix</TableHead>
                   <TableHead>Məbləğ</TableHead>
@@ -87,6 +88,7 @@ export default function InstallmentsPage() {
                     <TableRow key={inst.id} className="hover:bg-muted/30 transition-colors">
                       <TableCell className="font-medium text-muted-foreground">#{inst.id}</TableCell>
                       <TableCell className="font-semibold">Satış #{inst.saleId}</TableCell>
+                      <TableCell className="font-medium">{inst.customerName}</TableCell>
                       <TableCell>
                         <span className="bg-secondary text-secondary-foreground px-2 py-1 rounded text-xs font-bold">
                           {inst.installmentNumber}. Ay

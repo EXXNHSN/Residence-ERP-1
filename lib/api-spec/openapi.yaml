@@ -931,6 +931,8 @@ components:
           type: integer
         saleId:
           type: integer
+        customerName:
+          type: string
         dueDate:
           type: string
         amount:
@@ -945,6 +947,7 @@ components:
       required:
         - id
         - saleId
+        - customerName
         - dueDate
         - amount
         - status

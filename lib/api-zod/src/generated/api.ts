@@ -248,6 +248,7 @@ export const GetSaleResponse = zod
         zod.object({
           id: zod.number(),
           saleId: zod.number(),
+          customerName: zod.string(),
           dueDate: zod.string(),
           amount: zod.number(),
           paidDate: zod.string().nullish(),
@@ -288,6 +289,7 @@ export const ListInstallmentsQueryParams = zod.object({
 export const ListInstallmentsResponseItem = zod.object({
   id: zod.number(),
   saleId: zod.number(),
+  customerName: zod.string(),
   dueDate: zod.string(),
   amount: zod.number(),
   paidDate: zod.string().nullish(),
@@ -310,6 +312,7 @@ export const PayInstallmentBody = zod.object({
 export const PayInstallmentResponse = zod.object({
   id: zod.number(),
   saleId: zod.number(),
+  customerName: zod.string(),
   dueDate: zod.string(),
   amount: zod.number(),
   paidDate: zod.string().nullish(),

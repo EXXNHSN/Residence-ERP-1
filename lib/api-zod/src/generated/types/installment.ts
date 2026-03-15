@@ -10,6 +10,7 @@ import type { PaymentStatus } from "./paymentStatus";
 export interface Installment {
   id: number;
   saleId: number;
+  customerName: string;
   dueDate: string;
   amount: number;
   paidDate?: string | null;
