@@ -39,11 +39,22 @@ router.get("/summary", async (_req, res) => {
   const totalSales = allSales.length;
   const cashSales = allSales.filter((s) => s.saleType === "cash").length;
   const creditSales = allSales.filter((s) => s.saleType === "credit").length;
-  const totalRevenue = allSales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
 
   const allInstallments = await db.select().from(installmentsTable);
   const pendingInstallments = allInstallments.filter((i) => i.status === "pending").length;
   const overdueInstallments = allInstallments.filter((i) => i.status === "overdue").length;
+
+  // Faktiki daxil olan gəlir:
+  // - Nağd satışlar: tam məbləğ (dərhal alınıb)
+  // - Kredit satışlar: ilkin ödəniş + ödənilmiş taksitlər
+  const paidInstallmentsBySale: Record<number, number> = {};
+  for (const inst of allInstallments.filter((i) => i.status === "paid")) {
+    paidInstallmentsBySale[inst.saleId] = (paidInstallmentsBySale[inst.saleId] ?? 0) + Number(inst.amount);
+  }
+  const totalRevenue = allSales.reduce((sum, s) => {
+    if (s.saleType === "cash") return sum + Number(s.totalAmount);
+    return sum + Number(s.downPayment) + (paidInstallmentsBySale[s.id] ?? 0);
+  }, 0);
   const paidThisMonth = allInstallments
     .filter(
       (i) =>
