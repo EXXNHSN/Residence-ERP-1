@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { 
-  useListCustomers, 
   useListApartments, 
   useListObjects, 
   useCreateSale,
+  useCreateCustomer,
   useListTariffs,
   SaleType,
   CreateSaleInputAssetType,
@@ -17,26 +17,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
 import { useLocation } from "wouter";
-import { Loader2, ArrowLeft, Calculator } from "lucide-react";
+import { Loader2, ArrowLeft, Calculator, User } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
 
 export default function CreateSalePage() {
   const [, setLocation] = useLocation();
-  const { data: customers } = useListCustomers();
   const { data: apartments } = useListApartments({ status: ApartmentStatus.available });
   const { data: objects } = useListObjects({ status: ObjectStatus.available });
   const { data: tariffs } = useListTariffs();
 
+  const { mutateAsync: createCustomer } = useCreateCustomer();
   const { mutate: createSale, isPending } = useCreateSale({
     mutation: {
       onSuccess: () => setLocation("/sales")
     }
   });
 
-  const { register, handleSubmit, control, watch, setValue } = useForm({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
-      customerId: "",
+      firstName: "",
+      lastName: "",
+      fin: "",
+      phone: "",
+      address: "",
       assetType: CreateSaleInputAssetType.apartment,
       assetId: "",
       saleType: SaleType.cash,
@@ -53,7 +57,8 @@ export default function CreateSalePage() {
   const watchDownPayment = watch("downPayment");
   const watchMonths = watch("installmentMonths");
 
-  // Auto-fill price per sqm based on tariff and selected asset type
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     if (tariffs && watchAssetType && !watchPrice) {
       if (watchAssetType === 'apartment') setValue('pricePerSqm', tariffs.apartmentPricePerSqm.toString());
@@ -62,7 +67,6 @@ export default function CreateSalePage() {
     }
   }, [tariffs, watchAssetType, watchPrice, setValue]);
 
-  // Client-side calculator
   const [calcResult, setCalcResult] = useState({ total: 0, monthly: 0 });
 
   useEffect(() => {
@@ -92,18 +96,33 @@ export default function CreateSalePage() {
   }, [watchAssetType, watchAssetId, watchPrice, watchSaleType, watchDownPayment, watchMonths, apartments, objects]);
 
 
-  const onSubmit = (data: any) => {
-    createSale({
-      data: {
-        customerId: Number(data.customerId),
-        assetType: data.assetType,
-        assetId: Number(data.assetId),
-        saleType: data.saleType,
-        pricePerSqm: Number(data.pricePerSqm),
-        downPayment: data.saleType === 'credit' ? Number(data.downPayment) : 0,
-        installmentMonths: data.saleType === 'credit' ? Number(data.installmentMonths) : undefined,
-      }
-    });
+  const onSubmit = async (data: any) => {
+    setIsSubmitting(true);
+    try {
+      const customer = await createCustomer({
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          fin: data.fin || undefined,
+          phone: data.phone,
+          address: data.address || undefined,
+        }
+      });
+
+      createSale({
+        data: {
+          customerId: customer.id,
+          assetType: data.assetType,
+          assetId: Number(data.assetId),
+          saleType: data.saleType,
+          pricePerSqm: Number(data.pricePerSqm),
+          downPayment: data.saleType === 'credit' ? Number(data.downPayment) : 0,
+          installmentMonths: data.saleType === 'credit' ? Number(data.installmentMonths) : undefined,
+        }
+      });
+    } catch {
+      setIsSubmitting(false);
+    }
   };
 
   const getAvailableAssets = () => {
@@ -112,6 +131,8 @@ export default function CreateSalePage() {
     if (watchAssetType === 'garage') return objects?.filter(o => o.type === 'garage') || [];
     return [];
   };
+
+  const loading = isPending || isSubmitting;
 
   return (
     <AppLayout>
@@ -122,36 +143,75 @@ export default function CreateSalePage() {
           </Link>
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Yeni Satış</h1>
-            <p className="text-muted-foreground mt-1">Müştəriyə aktiv satışı və qrafik tərtibi</p>
+            <p className="text-muted-foreground mt-1">Müştəri məlumatları və aktiv satışı</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
+
             <Card className="border-none shadow-lg shadow-black/5">
-              <CardContent className="p-6 space-y-6">
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Müştəri Seçin</label>
-                  <Controller
-                    name="customerId"
-                    control={control}
-                    rules={{ required: true }}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className="rounded-xl h-12 bg-slate-50">
-                          <SelectValue placeholder="Siyahıdan seçin..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {customers?.map(c => (
-                            <SelectItem key={c.id} value={c.id.toString()}>{c.firstName} {c.lastName} ({c.fin})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  Müştəri Məlumatları
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-2 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Ad <span className="text-destructive">*</span></label>
+                    <Input
+                      {...register("firstName", { required: true })}
+                      placeholder="Əli"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.firstName ? "border-destructive" : ""}`}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Soyad <span className="text-destructive">*</span></label>
+                    <Input
+                      {...register("lastName", { required: true })}
+                      placeholder="Əliyev"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.lastName ? "border-destructive" : ""}`}
+                    />
+                  </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Telefon <span className="text-destructive">*</span></label>
+                    <Input
+                      {...register("phone", { required: true })}
+                      placeholder="+994 50 000 00 00"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.phone ? "border-destructive" : ""}`}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">FİN Kod</label>
+                    <Input
+                      {...register("fin")}
+                      placeholder="1234ABC"
+                      className="rounded-xl h-12 bg-slate-50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ünvan</label>
+                  <Input
+                    {...register("address")}
+                    placeholder="Naxçıvan, ..."
+                    className="rounded-xl h-12 bg-slate-50"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-lg shadow-black/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Aktiv və Ödəniş</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-2 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Aktiv Növü</label>
@@ -234,9 +294,9 @@ export default function CreateSalePage() {
                     </div>
                   </div>
                 )}
-                
               </CardContent>
             </Card>
+
           </div>
 
           <div className="md:col-span-1 space-y-6">
@@ -270,8 +330,8 @@ export default function CreateSalePage() {
                   </>
                 )}
 
-                <Button type="submit" disabled={isPending || !watchAssetId} className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all mt-6">
-                  {isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : "Satışı Təsdiqlə"}
+                <Button type="submit" disabled={loading || !watchAssetId} className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all mt-6">
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Satışı Təsdiqlə"}
                 </Button>
               </CardContent>
             </Card>
