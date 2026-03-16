@@ -939,6 +939,10 @@ components:
           type: integer
         customerName:
           type: string
+        assetDescription:
+          type: string
+        monthlyPayment:
+          type: number
         dueDate:
           type: string
         amount:
@@ -954,6 +958,8 @@ components:
         - id
         - saleId
         - customerName
+        - assetDescription
+        - monthlyPayment
         - dueDate
         - amount
         - status

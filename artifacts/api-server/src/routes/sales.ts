@@ -149,10 +149,14 @@ router.post("/", async (req, res) => {
     const totalScheduled = baseAmount * (months - 1);
     const lastAmount = Math.round((creditAmount - totalScheduled) * 100) / 100;
 
+    const saleDay = sale.saleDate.getDate();
+
     for (let i = 0; i < months; i++) {
-      const dueDate = new Date();
+      const dueDate = new Date(sale.saleDate);
       dueDate.setMonth(dueDate.getMonth() + i + 1);
-      dueDate.setDate(1);
+      // Keep same day of month as sale date (e.g., sold on 10th → due on 10th)
+      const maxDay = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate();
+      dueDate.setDate(Math.min(saleDay, maxDay));
       installments.push({
         saleId: sale.id,
         installmentNumber: i + 1,
