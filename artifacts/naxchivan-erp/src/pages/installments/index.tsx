@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, User } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -39,6 +39,17 @@ export default function InstallmentsPage() {
     }
   };
 
+  const grouped = installments?.reduce((acc, inst) => {
+    const key = `${inst.saleId}-${inst.customerName}`;
+    if (!acc[key]) {
+      acc[key] = { saleId: inst.saleId, customerName: inst.customerName, items: [] };
+    }
+    acc[key].items.push(inst);
+    return acc;
+  }, {} as Record<string, { saleId: number; customerName: string; items: typeof installments }>) ?? {};
+
+  const groups = Object.values(grouped);
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -61,63 +72,72 @@ export default function InstallmentsPage() {
           </Select>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border/50 shadow-lg shadow-black/5 overflow-hidden">
-          {isLoading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-20">ID</TableHead>
-                  <TableHead>Satış ID</TableHead>
-                  <TableHead>Müştəri</TableHead>
-                  <TableHead>Növbə</TableHead>
-                  <TableHead>Tarix</TableHead>
-                  <TableHead>Məbləğ</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Əməliyyat</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {installments?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
-                  </TableRow>
-                ) : (
-                  installments?.map((inst) => (
-                    <TableRow key={inst.id} className="hover:bg-muted/30 transition-colors">
-                      <TableCell className="font-medium text-muted-foreground">#{inst.id}</TableCell>
-                      <TableCell className="font-semibold">Satış #{inst.saleId}</TableCell>
-                      <TableCell className="font-medium">{inst.customerName}</TableCell>
-                      <TableCell>
-                        <span className="bg-secondary text-secondary-foreground px-2 py-1 rounded text-xs font-bold">
-                          {inst.installmentNumber}. Ay
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {format(new Date(inst.dueDate), 'dd.MM.yyyy')}
-                        {inst.paidDate && <div className="text-xs text-emerald-600 mt-0.5">Ödənilib: {format(new Date(inst.paidDate), 'dd.MM.yyyy')}</div>}
-                      </TableCell>
-                      <TableCell className="font-bold text-foreground">{formatCurrency(inst.amount)}</TableCell>
-                      <TableCell><StatusBadge status={inst.status} type="payment" /></TableCell>
-                      <TableCell className="text-right">
-                        {inst.status !== 'paid' && (
-                          <Button 
-                            size="sm" 
-                            className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20"
-                            onClick={() => setPayDialog({ isOpen: true, installmentId: inst.id })}
-                          >
-                            <CheckCircle2 className="w-4 h-4 mr-1.5" /> Ödəniş et
-                          </Button>
-                        )}
-                      </TableCell>
+        {isLoading ? (
+          <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+        ) : groups.length === 0 ? (
+          <div className="bg-card rounded-2xl border border-border/50 shadow-lg shadow-black/5 p-12 text-center text-muted-foreground">
+            Məlumat tapılmadı
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {groups.map((group) => (
+              <div key={`${group.saleId}-${group.customerName}`} className="bg-card rounded-2xl border border-border/50 shadow-lg shadow-black/5 overflow-hidden">
+                <div className="flex items-center gap-3 px-6 py-4 bg-muted/40 border-b border-border/50">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-foreground">{group.customerName}</p>
+                    <p className="text-xs text-muted-foreground">Satış #{group.saleId} · {group.items.length} aylıq ödəniş</p>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader className="bg-muted/20">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-16">Ay</TableHead>
+                      <TableHead>Ödəniş Tarixi</TableHead>
+                      <TableHead>Məbləğ</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Əməliyyat</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </div>
+                  </TableHeader>
+                  <TableBody>
+                    {group.items.map((inst) => (
+                      <TableRow key={inst.id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell>
+                          <span className="bg-secondary text-secondary-foreground px-2 py-1 rounded text-xs font-bold">
+                            {inst.installmentNumber}. Ay
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {format(new Date(inst.dueDate), 'dd.MM.yyyy')}
+                          {inst.paidDate && (
+                            <div className="text-xs text-emerald-600 mt-0.5">
+                              Ödənilib: {format(new Date(inst.paidDate), 'dd.MM.yyyy')}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-bold text-foreground">{formatCurrency(inst.amount)}</TableCell>
+                        <TableCell><StatusBadge status={inst.status} type="payment" /></TableCell>
+                        <TableCell className="text-right">
+                          {inst.status !== 'paid' && (
+                            <Button
+                              size="sm"
+                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20"
+                              onClick={() => setPayDialog({ isOpen: true, installmentId: inst.id })}
+                            >
+                              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Ödəniş et
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </div>
+        )}
 
         <Dialog open={payDialog.isOpen} onOpenChange={(open) => !open && setPayDialog({ isOpen: false, installmentId: null })}>
           <DialogContent className="rounded-2xl">

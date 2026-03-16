@@ -10,5 +10,6 @@ export interface CreateApartmentInput {
   blockId: number;
   number: string;
   floor: number;
+  rooms: number;
   area: number;
 }

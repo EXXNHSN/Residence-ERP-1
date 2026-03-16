@@ -18,6 +18,7 @@ async function enrichApartment(apt: typeof apartmentsTable.$inferSelect, blockNa
     blockName,
     number: apt.number,
     floor: apt.floor,
+    rooms: apt.rooms,
     area,
     status: apt.status,
     pricePerSqm,
@@ -44,10 +45,10 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { blockId, number, floor, area } = req.body;
+  const { blockId, number, floor, rooms, area } = req.body;
   const [apt] = await db
     .insert(apartmentsTable)
-    .values({ blockId, number, floor, area: String(area) })
+    .values({ blockId, number, floor, rooms: rooms ?? 1, area: String(area) })
     .returning();
   const block = await db.select().from(blocksTable).where(eq(blocksTable.id, blockId)).limit(1);
   const pricePerSqm = await getApartmentPricePerSqm();

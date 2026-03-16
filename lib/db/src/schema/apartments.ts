@@ -8,6 +8,7 @@ export const apartmentsTable = pgTable("apartments", {
   blockId: integer("block_id").notNull().references(() => blocksTable.id),
   number: text("number").notNull(),
   floor: integer("floor").notNull(),
+  rooms: integer("rooms").notNull().default(1),
   area: numeric("area", { precision: 10, scale: 2 }).notNull(),
   status: text("status", { enum: ["available", "sold", "reserved"] }).notNull().default("available"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

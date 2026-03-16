@@ -45,6 +45,7 @@ export const ListApartmentsResponseItem = zod.object({
   blockName: zod.string(),
   number: zod.string(),
   floor: zod.number(),
+  rooms: zod.number(),
   area: zod.number(),
   status: zod.enum(["available", "sold", "reserved"]),
   pricePerSqm: zod.number().optional(),
@@ -59,6 +60,7 @@ export const CreateApartmentBody = zod.object({
   blockId: zod.number(),
   number: zod.string(),
   floor: zod.number(),
+  rooms: zod.number(),
   area: zod.number(),
 });
 
@@ -75,6 +77,7 @@ export const GetApartmentResponse = zod.object({
   blockName: zod.string(),
   number: zod.string(),
   floor: zod.number(),
+  rooms: zod.number(),
   area: zod.number(),
   status: zod.enum(["available", "sold", "reserved"]),
   pricePerSqm: zod.number().optional(),

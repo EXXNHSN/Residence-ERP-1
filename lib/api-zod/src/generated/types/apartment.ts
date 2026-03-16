@@ -13,6 +13,7 @@ export interface Apartment {
   blockName: string;
   number: string;
   floor: number;
+  rooms: number;
   area: number;
   status: ApartmentStatus;
   pricePerSqm?: number;

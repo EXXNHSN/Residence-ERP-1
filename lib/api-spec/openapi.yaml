@@ -675,6 +675,8 @@ components:
           type: string
         floor:
           type: integer
+        rooms:
+          type: integer
         area:
           type: number
         status:
@@ -689,6 +691,7 @@ components:
         - blockName
         - number
         - floor
+        - rooms
         - area
         - status
 
@@ -701,12 +704,15 @@ components:
           type: string
         floor:
           type: integer
+        rooms:
+          type: integer
         area:
           type: number
       required:
         - blockId
         - number
         - floor
+        - rooms
         - area
 
     ObjectGarage:

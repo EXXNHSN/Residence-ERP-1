@@ -41,6 +41,7 @@ export default function ApartmentsPage() {
       blockId: "",
       number: "",
       floor: "",
+      rooms: "",
       area: ""
     }
   });
@@ -51,6 +52,7 @@ export default function ApartmentsPage() {
         blockId: Number(data.blockId),
         number: data.number,
         floor: Number(data.floor),
+        rooms: Number(data.rooms),
         area: Number(data.area)
       }
     });
@@ -132,10 +134,16 @@ export default function ApartmentsPage() {
                       <Input type="number" {...register("floor", { required: true })} className="rounded-xl h-11" placeholder="Məs: 5" />
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Sahə (m²)</label>
-                    <Input type="number" step="0.01" {...register("area", { required: true })} className="rounded-xl h-11" placeholder="Məs: 85.5" />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Otaq Sayı</label>
+                      <Input type="number" min="1" {...register("rooms", { required: true })} className="rounded-xl h-11" placeholder="Məs: 3" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Sahə (m²)</label>
+                      <Input type="number" step="0.01" {...register("area", { required: true })} className="rounded-xl h-11" placeholder="Məs: 85.5" />
+                    </div>
                   </div>
 
                   <Button type="submit" disabled={isPending} className="w-full h-12 rounded-xl text-md mt-4">
@@ -158,6 +166,7 @@ export default function ApartmentsPage() {
                   <TableHead>Blok</TableHead>
                   <TableHead>Mənzil №</TableHead>
                   <TableHead>Mərtəbə</TableHead>
+                  <TableHead>Otaq</TableHead>
                   <TableHead>Sahə</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -176,6 +185,7 @@ export default function ApartmentsPage() {
                         <Home className="w-4 h-4 text-primary/70" /> {apt.number}
                       </TableCell>
                       <TableCell>{apt.floor}</TableCell>
+                      <TableCell className="font-medium">{apt.rooms} otaq</TableCell>
                       <TableCell className="font-medium">{formatArea(apt.area)}</TableCell>
                       <TableCell><StatusBadge status={apt.status} type="apartment" /></TableCell>
                     </TableRow>
