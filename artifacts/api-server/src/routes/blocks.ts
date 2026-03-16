@@ -1,12 +1,24 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { blocksTable, apartmentsTable } from "@workspace/db/schema";
+import { blocksTable, apartmentsTable, quartersTable } from "@workspace/db/schema";
 import { eq, count } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/", async (_req, res) => {
-  const blocks = await db.select().from(blocksTable).orderBy(blocksTable.name);
+  const blocks = await db
+    .select({
+      id: blocksTable.id,
+      name: blocksTable.name,
+      quarterId: blocksTable.quarterId,
+      floors: blocksTable.floors,
+      createdAt: blocksTable.createdAt,
+      quarterName: quartersTable.name,
+    })
+    .from(blocksTable)
+    .leftJoin(quartersTable, eq(blocksTable.quarterId, quartersTable.id))
+    .orderBy(quartersTable.name, blocksTable.name);
+
   const counts = await db
     .select({ blockId: apartmentsTable.blockId, cnt: count() })
     .from(apartmentsTable)
@@ -18,9 +30,12 @@ router.get("/", async (_req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name } = req.body;
-  const [block] = await db.insert(blocksTable).values({ name }).returning();
-  res.status(201).json({ ...block, apartmentCount: 0 });
+  const { name, quarterId, floors } = req.body;
+  const [block] = await db
+    .insert(blocksTable)
+    .values({ name, quarterId: quarterId ? Number(quarterId) : null, floors: floors ? Number(floors) : 1 })
+    .returning();
+  res.status(201).json({ ...block, apartmentCount: 0, quarterName: null });
 });
 
 export default router;

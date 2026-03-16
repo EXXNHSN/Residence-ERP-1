@@ -64,14 +64,58 @@ export const InternetStatus = {
   cancelled: "cancelled",
 } as const;
 
+export interface Quarter {
+  id: number;
+  name: string;
+  description?: string | null;
+  buildingCount: number;
+  apartmentCount: number;
+}
+
+export interface CreateQuarterInput {
+  name: string;
+  description?: string;
+}
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export const UserRole = {
+  admin: "admin",
+  sales: "sales",
+} as const;
+
+export interface User {
+  id: number;
+  username: string;
+  fullName: string;
+  role: UserRole;
+}
+
+export interface CreateUserInput {
+  username: string;
+  password: string;
+  fullName: string;
+  role: UserRole;
+}
+
+export interface LoginInput {
+  username: string;
+  password: string;
+}
+
 export interface Block {
   id: number;
   name: string;
+  quarterId?: number | null;
+  quarterName?: string | null;
+  floors: number;
   apartmentCount: number;
 }
 
 export interface CreateBlockInput {
   name: string;
+  quarterId?: number;
+  floors?: number;
 }
 
 export interface Apartment {

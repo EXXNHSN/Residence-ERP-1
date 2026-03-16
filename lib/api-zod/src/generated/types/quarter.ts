@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CreateBlockInput {
+export interface Quarter {
+  id: number;
   name: string;
-  quarterId?: number;
-  floors?: number;
+  description?: string | null;
+  buildingCount: number;
+  apartmentCount: number;
 }

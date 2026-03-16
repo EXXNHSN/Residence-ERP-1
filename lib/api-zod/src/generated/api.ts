@@ -20,6 +20,9 @@ export const HealthCheckResponse = zod.object({
 export const ListBlocksResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
+  quarterId: zod.number().nullish(),
+  quarterName: zod.string().nullish(),
+  floors: zod.number(),
   apartmentCount: zod.number(),
 });
 export const ListBlocksResponse = zod.array(ListBlocksResponseItem);
@@ -29,6 +32,8 @@ export const ListBlocksResponse = zod.array(ListBlocksResponseItem);
  */
 export const CreateBlockBody = zod.object({
   name: zod.string(),
+  quarterId: zod.number().optional(),
+  floors: zod.number().optional(),
 });
 
 /**

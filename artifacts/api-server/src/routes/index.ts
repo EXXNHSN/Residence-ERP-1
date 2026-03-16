@@ -11,10 +11,14 @@ import communalRouter from "./communal";
 import internetRouter from "./internet";
 import tariffsRouter from "./tariffs";
 import statsRouter from "./stats";
+import quartersRouter from "./quarters";
+import authRouter from "./auth";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/quarters", quartersRouter);
 router.use("/blocks", blocksRouter);
 router.use("/apartments", apartmentsRouter);
 router.use("/objects", objectsRouter);
@@ -26,5 +30,7 @@ router.use("/communal", communalRouter);
 router.use("/internet", internetRouter);
 router.use("/tariffs", tariffsRouter);
 router.use("/stats", statsRouter);
+router.use("/auth", authRouter);
+router.use("/admin", adminRouter);
 
 export default router;

@@ -1,10 +1,13 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { quartersTable } from "./quarters";
 
 export const blocksTable = pgTable("blocks", {
   id: serial("id").primaryKey(),
+  quarterId: integer("quarter_id").references(() => quartersTable.id),
   name: text("name").notNull(),
+  floors: integer("floors").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

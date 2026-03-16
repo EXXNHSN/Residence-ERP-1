@@ -9,8 +9,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: quarters
+    description: Quarter management
   - name: blocks
     description: Block management
+  - name: auth
+    description: Authentication and user management
+  - name: admin
+    description: Admin project setup
   - name: apartments
     description: Apartment management
   - name: objects
@@ -640,6 +646,85 @@ components:
       type: string
       enum: [active, expired, cancelled]
 
+    Quarter:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        buildingCount:
+          type: integer
+        apartmentCount:
+          type: integer
+      required:
+        - id
+        - name
+        - buildingCount
+        - apartmentCount
+
+    CreateQuarterInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+
+    UserRole:
+      type: string
+      enum: [admin, sales]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - id
+        - username
+        - fullName
+        - role
+
+    CreateUserInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - username
+        - password
+        - fullName
+        - role
+
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
     Block:
       type: object
       properties:
@@ -647,11 +732,20 @@ components:
           type: integer
         name:
           type: string
+        quarterId:
+          type: integer
+          nullable: true
+        quarterName:
+          type: string
+          nullable: true
+        floors:
+          type: integer
         apartmentCount:
           type: integer
       required:
         - id
         - name
+        - floors
         - apartmentCount
 
     CreateBlockInput:
@@ -659,6 +753,10 @@ components:
       properties:
         name:
           type: string
+        quarterId:
+          type: integer
+        floors:
+          type: integer
       required:
         - name
 

@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CreateBlockInput {
-  name: string;
-  quarterId?: number;
-  floors?: number;
+export interface LoginInput {
+  username: string;
+  password: string;
 }

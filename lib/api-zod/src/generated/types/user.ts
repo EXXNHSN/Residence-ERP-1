@@ -5,12 +5,11 @@
  * Naxchivan Residence ERP API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserRole } from "./userRole";
 
-export interface Block {
+export interface User {
   id: number;
-  name: string;
-  quarterId?: number | null;
-  quarterName?: string | null;
-  floors: number;
-  apartmentCount: number;
+  username: string;
+  fullName: string;
+  role: UserRole;
 }
