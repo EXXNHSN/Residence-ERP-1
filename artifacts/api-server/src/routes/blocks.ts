@@ -52,4 +52,19 @@ router.put("/:id", async (req, res) => {
   res.json(updated);
 });
 
+router.delete("/:id", async (req, res) => {
+  const { username, password } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const [existing] = await db.select().from(blocksTable).where(eq(blocksTable.id, Number(req.params.id))).limit(1);
+  if (!existing) return res.status(404).json({ error: "Tapılmadı" });
+
+  const [aptCount] = await db.select({ cnt: count() }).from(apartmentsTable).where(eq(apartmentsTable.blockId, Number(req.params.id)));
+  if (Number(aptCount.cnt) > 0)
+    return res.status(409).json({ error: `Bu binada ${aptCount.cnt} mənzil var. Əvvəlcə mənzilləri silin.` });
+
+  await db.delete(blocksTable).where(eq(blocksTable.id, Number(req.params.id)));
+  res.status(204).send();
+});
+
 export default router;

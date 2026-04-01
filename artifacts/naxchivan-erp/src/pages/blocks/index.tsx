@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Building2, Plus, Loader2, MapPin, Pencil } from "lucide-react";
+import { Building2, Plus, Loader2, MapPin, Pencil, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBlocksQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,9 @@ export default function BlocksPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<any>(null);
   const [editName, setEditName] = useState("");
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingBlock, setDeletingBlock] = useState<any>(null);
 
   const queryClient = useQueryClient();
   const { mutate: createBlock, isPending } = useCreateBlock({
@@ -49,6 +52,11 @@ export default function BlocksPage() {
     setEditOpen(true);
   }
 
+  function openDelete(block: any) {
+    setDeletingBlock(block);
+    setDeleteOpen(true);
+  }
+
   async function handleSaveBlock(adminPassword: string) {
     const res = await fetch(`${BASE()}/api/blocks/${editingBlock.id}`, {
       method: "PUT",
@@ -63,6 +71,20 @@ export default function BlocksPage() {
     queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
   }
 
+  async function handleDeleteBlock(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/blocks/${deletingBlock.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user?.username, password: adminPassword }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: `"${deletingBlock.name}" silindi` });
+    queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -71,7 +93,7 @@ export default function BlocksPage() {
             <h1 className="text-3xl font-display font-bold text-foreground">Binalar</h1>
             <p className="text-muted-foreground mt-1">Bütün bina bloklarının siyahısı</p>
           </div>
-          
+
           {isAdmin && (
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
@@ -86,9 +108,9 @@ export default function BlocksPage() {
               <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Bina Adı</label>
-                  <Input 
-                    placeholder="Məs: A-1 Binası" 
-                    value={name} 
+                  <Input
+                    placeholder="Məs: A-1 Binası"
+                    value={name}
                     onChange={e => setName(e.target.value)}
                     className="rounded-xl h-12"
                     required
@@ -114,7 +136,7 @@ export default function BlocksPage() {
                   <TableHead>Məhəllə</TableHead>
                   <TableHead className="text-center">Mərtəbə</TableHead>
                   <TableHead className="text-right">Mənzil Sayı</TableHead>
-                  {isAdmin && <TableHead className="w-[60px]"></TableHead>}
+                  {isAdmin && <TableHead className="w-[90px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -149,11 +171,18 @@ export default function BlocksPage() {
                       </TableCell>
                       {isAdmin && (
                         <TableCell>
-                          <Button size="icon" variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-primary"
-                            onClick={() => openEdit(block)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button size="icon" variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={() => openEdit(block)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => openDelete(block)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -165,6 +194,7 @@ export default function BlocksPage() {
         </div>
       </div>
 
+      {/* Edit dialog */}
       <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
         title="Binanı Redaktə et" onSave={handleSaveBlock}>
         {editingBlock && (
@@ -176,6 +206,27 @@ export default function BlocksPage() {
               className="rounded-xl h-11"
               placeholder="Bina adı..."
             />
+          </div>
+        )}
+      </AdminEditDialog>
+
+      {/* Delete dialog */}
+      <AdminEditDialog open={deleteOpen} onClose={() => setDeleteOpen(false)}
+        title="Binanı Sil" onSave={handleDeleteBlock} saveLabel="Sil" saveVariant="destructive">
+        {deletingBlock && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Aşağıdakı binanı silmək istədiyinizə əminsiniz?
+            </p>
+            <div className="flex items-center gap-2 bg-destructive/10 text-destructive rounded-xl px-4 py-3 font-semibold">
+              <Building2 className="w-4 h-4 shrink-0" />
+              {deletingBlock.name}
+            </div>
+            {deletingBlock.apartmentCount > 0 && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
+                Bu binada {deletingBlock.apartmentCount} mənzil var. Silmə mümkün olmayacaq.
+              </p>
+            )}
           </div>
         )}
       </AdminEditDialog>

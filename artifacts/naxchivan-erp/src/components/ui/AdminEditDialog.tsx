@@ -17,6 +17,7 @@ interface AdminEditDialogProps {
   children: ReactNode;
   onSave: (adminPassword: string) => Promise<void>;
   saveLabel?: string;
+  saveVariant?: "default" | "destructive";
 }
 
 export function AdminEditDialog({
@@ -26,6 +27,7 @@ export function AdminEditDialog({
   children,
   onSave,
   saveLabel = "Yadda Saxla",
+  saveVariant = "default",
 }: AdminEditDialogProps) {
   const [adminPassword, setAdminPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -104,6 +106,7 @@ export function AdminEditDialog({
             Ləğv et
           </Button>
           <Button
+            variant={saveVariant}
             onClick={handleSave}
             disabled={loading || !adminPassword.trim()}
             className="rounded-xl min-w-[120px]"
