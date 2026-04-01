@@ -1,17 +1,69 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useGetCustomer } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
-import { Loader2, ArrowLeft, Phone, MapPin, Hash } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, MapPin, Hash, Pencil } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetCustomerQueryKey } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
+
+const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const { data: customer, isLoading, isError } = useGetCustomer(Number(id));
+  const { isAdmin, user } = useAuth();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editFin, setEditFin] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+
+  function openEdit() {
+    if (!customer) return;
+    setEditFirstName(customer.firstName);
+    setEditLastName(customer.lastName);
+    setEditPhone(customer.phone);
+    setEditFin(customer.fin ?? "");
+    setEditAddress(customer.address ?? "");
+    setEditOpen(true);
+  }
+
+  async function handleSaveCustomer(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/customers/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: user?.username,
+        password: adminPassword,
+        firstName: editFirstName,
+        lastName: editLastName,
+        phone: editPhone,
+        fin: editFin,
+        address: editAddress,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: "Müştəri məlumatları yeniləndi" });
+    qc.invalidateQueries({ queryKey: getGetCustomerQueryKey(Number(id)) });
+  }
 
   if (isLoading) {
     return <AppLayout><div className="flex justify-center p-24"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></AppLayout>;
@@ -37,7 +89,14 @@ export default function CustomerDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="border-none shadow-lg shadow-black/5 md:col-span-1 h-fit">
             <CardContent className="p-6">
-              <div className="flex flex-col items-center text-center border-b border-border/50 pb-6 mb-6">
+              <div className="flex flex-col items-center text-center border-b border-border/50 pb-6 mb-6 relative">
+                {isAdmin && (
+                  <Button size="icon" variant="ghost"
+                    className="absolute top-0 right-0 h-8 w-8 text-muted-foreground hover:text-primary"
+                    onClick={openEdit}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center text-white text-3xl font-bold mb-4 shadow-lg shadow-primary/20">
                   {customer.firstName[0]}{customer.lastName[0]}
                 </div>
@@ -125,6 +184,41 @@ export default function CustomerDetailPage() {
           </Card>
         </div>
       </div>
+
+      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
+        title="Müştərini Redaktə et" onSave={handleSaveCustomer}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ad</label>
+              <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)}
+                className="rounded-xl h-11" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Soyad</label>
+              <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)}
+                className="rounded-xl h-11" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Telefon</label>
+              <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
+                className="rounded-xl h-11" placeholder="+994..." />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">FIN Kod</label>
+              <Input value={editFin} onChange={(e) => setEditFin(e.target.value)}
+                className="rounded-xl h-11" maxLength={7} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Ünvan</label>
+            <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)}
+              className="rounded-xl h-11" />
+          </div>
+        </div>
+      </AdminEditDialog>
     </AppLayout>
   );
 }

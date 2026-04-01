@@ -33,6 +33,20 @@ router.post("/", async (req, res) => {
   res.status(201).json({ ...quarter, buildingCount: 0, apartmentCount: 0 });
 });
 
+router.put("/:id", async (req, res) => {
+  const { username, password, name, description } = req.body ?? {};
+  const { verifyAdmin } = await import("./adminVerify");
+  if (!(await verifyAdmin(username, password, res))) return;
+  if (!name?.trim()) return res.status(400).json({ error: "Ad boş ola bilməz" });
+  const [updated] = await db
+    .update(quartersTable)
+    .set({ name: name.trim(), description: description ?? null })
+    .where(eq(quartersTable.id, Number(req.params.id)))
+    .returning();
+  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  res.json(updated);
+});
+
 // Cascade delete: apartments → blocks → buildings → quarter
 // Requires password confirmation in request body
 router.delete("/:id", async (req, res) => {

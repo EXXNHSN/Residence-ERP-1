@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { apartmentsTable, blocksTable, tariffsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 

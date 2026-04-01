@@ -5,15 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, Search, User, Phone } from "lucide-react";
+import { Plus, Loader2, Search, Phone, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListCustomersQueryKey } from "@workspace/api-client-react";
 import { useForm } from "react-hook-form";
 import { Link } from "wouter";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+
+const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const { isAdmin, user } = useAuth();
+  const { toast } = useToast();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editFin, setEditFin] = useState("");
+  const [editAddress, setEditAddress] = useState("");
 
   const { data: customers, isLoading } = useListCustomers({ search: search || undefined });
   
@@ -41,6 +56,38 @@ export default function CustomersPage() {
   const onSubmit = (data: any) => {
     createCustomer({ data });
   };
+
+  function openEdit(cust: any) {
+    setEditingCustomer(cust);
+    setEditFirstName(cust.firstName);
+    setEditLastName(cust.lastName);
+    setEditPhone(cust.phone);
+    setEditFin(cust.fin ?? "");
+    setEditAddress(cust.address ?? "");
+    setEditOpen(true);
+  }
+
+  async function handleSaveCustomer(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/customers/${editingCustomer.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: user?.username,
+        password: adminPassword,
+        firstName: editFirstName,
+        lastName: editLastName,
+        phone: editPhone,
+        fin: editFin,
+        address: editAddress,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: `${editFirstName} ${editLastName} yeniləndi` });
+    queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+  }
 
   return (
     <AppLayout>
@@ -148,9 +195,17 @@ export default function CustomersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/customers/${cust.id}`} className="text-primary hover:underline text-sm font-medium">
-                          Ətraflı
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          {isAdmin && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={() => openEdit(cust)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          <Link href={`/customers/${cust.id}`} className="text-primary hover:underline text-sm font-medium">
+                            Ətraflı
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -160,6 +215,43 @@ export default function CustomersPage() {
           )}
         </div>
       </div>
+
+      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
+        title="Müştərini Redaktə et" onSave={handleSaveCustomer}>
+        {editingCustomer && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Ad</label>
+                <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)}
+                  className="rounded-xl h-11" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Soyad</label>
+                <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)}
+                  className="rounded-xl h-11" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Telefon</label>
+                <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
+                  className="rounded-xl h-11" placeholder="+994..." />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">FIN Kod</label>
+                <Input value={editFin} onChange={(e) => setEditFin(e.target.value)}
+                  className="rounded-xl h-11" maxLength={7} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ünvan</label>
+              <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)}
+                className="rounded-xl h-11" />
+            </div>
+          </div>
+        )}
+      </AdminEditDialog>
     </AppLayout>
   );
 }

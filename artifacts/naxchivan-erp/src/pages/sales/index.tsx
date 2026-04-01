@@ -1,16 +1,68 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useListSales } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Progress } from "@/components/ui/progress";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function SalesPage() {
   const { data: sales, isLoading } = useListSales();
+  const { isAdmin, user } = useAuth();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<any>(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [editDown, setEditDown] = useState("");
+  const [editMonths, setEditMonths] = useState("");
+  const [editDate, setEditDate] = useState("");
+
+  function openEdit(sale: any) {
+    setEditingSale(sale);
+    setEditPrice(sale.pricePerSqm?.toString() ?? "");
+    setEditDown(sale.downPayment?.toString() ?? "0");
+    setEditMonths(sale.installmentMonths?.toString() ?? "12");
+    setEditDate(format(new Date(sale.saleDate), "yyyy-MM-dd"));
+    setEditOpen(true);
+  }
+
+  async function handleSaveSale(adminPassword: string) {
+    const body: any = {
+      username: user?.username,
+      password: adminPassword,
+      pricePerSqm: Number(editPrice),
+      saleDate: editDate,
+    };
+    if (editingSale?.saleType === "credit") {
+      body.downPayment = Number(editDown);
+      body.installmentMonths = Number(editMonths);
+    }
+    const res = await fetch(`${BASE()}/api/sales/${editingSale.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: "Satış məlumatları yeniləndi" });
+    qc.invalidateQueries({ queryKey: ["sales"] });
+    qc.invalidateQueries({ queryKey: ["customers"] });
+  }
 
   return (
     <AppLayout>
@@ -41,12 +93,13 @@ export default function SalesPage() {
                   <TableHead className="text-right">Ödənilib</TableHead>
                   <TableHead className="text-right">Qalıq Borc</TableHead>
                   <TableHead className="w-[120px]">İrəliləyiş</TableHead>
+                  {isAdmin && <TableHead className="w-[60px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sales?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
+                    <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
                   </TableRow>
                 ) : (
                   sales?.map((sale) => (
@@ -81,6 +134,14 @@ export default function SalesPage() {
                           <Progress value={sale.progressPercent} className="h-2 bg-slate-100" />
                         </div>
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            onClick={() => openEdit(sale)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -89,6 +150,43 @@ export default function SalesPage() {
           )}
         </div>
       </div>
+
+      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
+        title="Satışı Redaktə et" onSave={handleSaveSale}>
+        {editingSale && (
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">
+              {editingSale.customerName} — {editingSale.assetDescription}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">1 m² Qiyməti (AZN)</label>
+                <Input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)}
+                  className="rounded-xl h-11" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tarix</label>
+                <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
+                  className="rounded-xl h-11" />
+              </div>
+            </div>
+            {editingSale.saleType === "credit" && (
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">İlkin Ödəniş (AZN)</label>
+                  <Input type="number" value={editDown} onChange={(e) => setEditDown(e.target.value)}
+                    className="rounded-xl h-11" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Müddət (Ay)</label>
+                  <Input type="number" value={editMonths} onChange={(e) => setEditMonths(e.target.value)}
+                    className="rounded-xl h-11" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </AdminEditDialog>
     </AppLayout>
   );
 }

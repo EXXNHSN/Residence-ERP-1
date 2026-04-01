@@ -10,6 +10,7 @@ import {
   tariffsTable,
 } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 
@@ -198,6 +199,78 @@ router.get("/:id", async (req, res) => {
       paidDate: inst.paidDate?.toISOString() ?? null,
     })),
   });
+});
+
+router.put("/:id", async (req, res) => {
+  const { username, password, pricePerSqm, downPayment, installmentMonths, saleDate } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const saleId = Number(req.params.id);
+  const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, saleId)).limit(1);
+  if (!sale) return res.status(404).json({ error: "Satış tapılmadı" });
+
+  const updates: Partial<typeof salesTable.$inferInsert> = {};
+
+  if (pricePerSqm !== undefined) {
+    const ppsqm = Number(pricePerSqm);
+    if (isNaN(ppsqm) || ppsqm <= 0) return res.status(400).json({ error: "Qiymət düzgün deyil" });
+    updates.pricePerSqm = String(ppsqm);
+
+    const asset = await getAssetInfo(sale.assetType, sale.assetId);
+    const newTotal = asset.area * ppsqm;
+    updates.totalAmount = String(newTotal);
+    updates.remainingAmount = String(newTotal - Number(sale.downPayment));
+  }
+
+  if (downPayment !== undefined && sale.saleType === "credit") {
+    const dp = Number(downPayment);
+    if (isNaN(dp) || dp < 0) return res.status(400).json({ error: "İlkin ödəniş düzgün deyil" });
+    updates.downPayment = String(dp);
+    const total = Number(updates.totalAmount ?? sale.totalAmount);
+    updates.remainingAmount = String(total - dp);
+  }
+
+  if (installmentMonths !== undefined && sale.saleType === "credit") {
+    const months = Number(installmentMonths);
+    if (isNaN(months) || months < 1) return res.status(400).json({ error: "Ay sayı düzgün deyil" });
+    updates.installmentMonths = months;
+  }
+
+  if (saleDate !== undefined) {
+    updates.saleDate = new Date(saleDate);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "Heç bir dəyişiklik yoxdur" });
+  }
+
+  const [updated] = await db
+    .update(salesTable)
+    .set(updates)
+    .where(eq(salesTable.id, saleId))
+    .returning();
+
+  if (updated && updated.installmentMonths && updated.saleType === "credit") {
+    const total = Number(updated.totalAmount);
+    const dp = Number(updated.downPayment);
+    const months = updated.installmentMonths;
+    const monthlyAmount = (total - dp) / months;
+
+    const existingInstallments = await db
+      .select()
+      .from(installmentsTable)
+      .where(eq(installmentsTable.saleId, saleId));
+
+    const unpaid = existingInstallments.filter(i => i.status === "pending");
+    for (const inst of unpaid) {
+      await db
+        .update(installmentsTable)
+        .set({ amount: String(monthlyAmount) })
+        .where(eq(installmentsTable.id, inst.id));
+    }
+  }
+
+  res.json(await enrichSale(updated!));
 });
 
 export default router;

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { blocksTable, apartmentsTable, quartersTable } from "@workspace/db/schema";
 import { eq, count } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 
@@ -36,6 +37,19 @@ router.post("/", async (req, res) => {
     .values({ name, quarterId: quarterId ? Number(quarterId) : null, floors: floors ? Number(floors) : 1 })
     .returning();
   res.status(201).json({ ...block, apartmentCount: 0, quarterName: null });
+});
+
+router.put("/:id", async (req, res) => {
+  const { username, password, name } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+  if (!name?.trim()) return res.status(400).json({ error: "Ad boş ola bilməz" });
+  const [updated] = await db
+    .update(blocksTable)
+    .set({ name: name.trim() })
+    .where(eq(blocksTable.id, Number(req.params.id)))
+    .returning();
+  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  res.json(updated);
 });
 
 export default router;

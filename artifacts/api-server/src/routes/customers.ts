@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable } from "@workspace/db/schema";
 import { eq, or, ilike } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 
@@ -96,6 +97,27 @@ router.get("/:id", async (req, res) => {
   );
 
   res.json({ ...customer, sales: enrichedSales });
+});
+
+router.put("/:id", async (req, res) => {
+  const { username, password, firstName, lastName, fin, phone, address } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+  if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
+    return res.status(400).json({ error: "Ad, soyad və telefon tələb olunur" });
+  }
+  const [updated] = await db
+    .update(customersTable)
+    .set({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+      fin: fin?.trim() || null,
+      address: address?.trim() || null,
+    })
+    .where(eq(customersTable.id, Number(req.params.id)))
+    .returning();
+  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  res.json(updated);
 });
 
 export default router;
