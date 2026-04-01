@@ -31,29 +31,29 @@ interface Building {
   blockCount: number; apartmentCount: number; blocks: BuildingBlock[];
 }
 
-interface AptConfig { area: number; rooms: number; }
+interface AptConfig { number: string; area: number; rooms: number; }
 
 interface FloorRow {
   floor: number;
   apartments: AptConfig[];
 }
 
-interface BlockForm { name: string; totalFloors: number; floors: FloorRow[]; }
+interface BlockForm { name: string; totalFloors: number; startFloor: number; floors: FloorRow[]; }
 interface BuildingForm { name: string; blocks: BlockForm[]; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeApt(area = 80, rooms = 2): AptConfig { return { area, rooms }; }
+function makeApt(area = 80, rooms = 2): AptConfig { return { number: "", area, rooms }; }
 
-function makeFloors(count: number, apts = 4, area = 80, rooms = 2): FloorRow[] {
+function makeFloors(count: number, startFloor = 2, apts = 4, area = 80, rooms = 2): FloorRow[] {
   return Array.from({ length: count }, (_, i) => ({
-    floor: i + 1,
+    floor: startFloor + i,
     apartments: Array.from({ length: apts }, () => makeApt(area, rooms)),
   }));
 }
 
 function emptyBlock(floors = 9): BlockForm {
-  return { name: "", totalFloors: floors, floors: makeFloors(floors) };
+  return { name: "", totalFloors: floors, startFloor: 2, floors: makeFloors(floors, 2) };
 }
 function emptyBuilding(): BuildingForm { return { name: "", blocks: [emptyBlock()] }; }
 
@@ -77,6 +77,29 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
 
   const totalApts = block.floors.reduce((s, f) => s + (f.apartments?.length ?? 0), 0);
 
+  // Regenerate all floors using current startFloor
+  function rebuildFloors(totalFloors: number, startFloor: number) {
+    const existing = block.floors;
+    return Array.from({ length: totalFloors }, (_, i) => {
+      const floorNum = startFloor + i;
+      const prev = existing.find((f) => f.floor === floorNum);
+      return prev ?? {
+        floor: floorNum,
+        apartments: Array.from({ length: defApts }, () => makeApt(defArea, defRooms)),
+      };
+    });
+  }
+
+  function handleTotalFloors(newCount: number) {
+    if (newCount < 1 || newCount > 99) return;
+    onChange({ ...block, totalFloors: newCount, floors: rebuildFloors(newCount, block.startFloor) });
+  }
+
+  function handleStartFloor(newStart: number) {
+    if (newStart < 1 || newStart > 99) return;
+    onChange({ ...block, startFloor: newStart, floors: rebuildFloors(block.totalFloors, newStart) });
+  }
+
   function applyDefaults() {
     onChange({
       ...block,
@@ -87,31 +110,18 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
     });
   }
 
-  function handleTotalFloors(newCount: number) {
-    if (newCount < 1 || newCount > 99) return;
-    const existing = block.floors;
-    let floors: FloorRow[];
-    if (newCount > existing.length) {
-      floors = [
-        ...existing,
-        ...Array.from({ length: newCount - existing.length }, (_, i) => ({
-          floor: existing.length + i + 1,
-          apartments: Array.from({ length: defApts }, () => makeApt(defArea, defRooms)),
-        })),
-      ];
-    } else {
-      floors = existing.slice(0, newCount);
-    }
-    onChange({ ...block, totalFloors: newCount, floors });
-  }
-
-  function updateApt(floorIdx: number, aptIdx: number, field: keyof AptConfig, val: number) {
+  function updateAptNumber(floorIdx: number, aptIdx: number, val: string) {
     const floors = block.floors.map((f, fi) => {
       if (fi !== floorIdx) return f;
-      return {
-        ...f,
-        apartments: (f.apartments ?? []).map((a, ai) => ai === aptIdx ? { ...a, [field]: val } : a),
-      };
+      return { ...f, apartments: (f.apartments ?? []).map((a, ai) => ai === aptIdx ? { ...a, number: val } : a) };
+    });
+    onChange({ ...block, floors });
+  }
+
+  function updateAptField(floorIdx: number, aptIdx: number, field: "area" | "rooms", val: number) {
+    const floors = block.floors.map((f, fi) => {
+      if (fi !== floorIdx) return f;
+      return { ...f, apartments: (f.apartments ?? []).map((a, ai) => ai === aptIdx ? { ...a, [field]: val } : a) };
     });
     onChange({ ...block, floors });
   }
@@ -141,6 +151,12 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
     <div className="space-y-3">
       {/* Defaults bar */}
       <div className="flex flex-wrap gap-2 items-end bg-muted/30 rounded-xl px-3 py-2.5">
+        <div className="space-y-1">
+          <label className="text-[11px] text-muted-foreground font-medium">Başlanğıc mərtəbə</label>
+          <Input type="number" min={1} max={99} value={block.startFloor}
+            onChange={(e) => handleStartFloor(Number(e.target.value))}
+            className="h-7 w-16 text-xs font-bold" />
+        </div>
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground font-medium">Mərtəbə sayı</label>
           <Input type="number" min={1} max={99} value={block.totalFloors}
@@ -172,11 +188,19 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
         </div>
       </div>
 
+      {block.floors.length > 0 && (
+        <p className="text-[11px] text-muted-foreground px-1">
+          Mərtəbə aralığı: <strong>{block.floors[0].floor}</strong> – <strong>{block.floors[block.floors.length - 1].floor}</strong>
+          {" "}· Hər mərtəbənin üzərinə klik edib mənzil nömrəsini, otaq sayını və sahəsini ayrıca daxil edin.
+        </p>
+      )}
+
       {/* Floor rows */}
       <div className="border border-border/50 rounded-xl overflow-hidden divide-y divide-border/30">
         {block.floors.map((f, fi) => {
           const isOpen = expandedFloors.has(f.floor);
           const aptCount = f.apartments?.length ?? 0;
+          const filledNums = (f.apartments ?? []).filter((a) => a.number.trim()).map((a) => a.number);
           return (
             <div key={fi} className={cn("bg-background", fi % 2 === 0 ? "" : "bg-muted/10")}>
               {/* Floor header row */}
@@ -188,9 +212,9 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
                 <span className="text-xs font-bold text-muted-foreground w-6">{f.floor}</span>
                 <span className="text-xs text-muted-foreground flex-1">
                   {aptCount} mənzil
-                  {aptCount > 0 && (
-                    <span className="ml-2 text-[11px] text-muted-foreground/60">
-                      [{(f.apartments ?? []).map((a) => `${a.rooms}o/${a.area}m²`).join(" · ")}]
+                  {filledNums.length > 0 && (
+                    <span className="ml-2 text-[11px] text-primary/70 font-medium">
+                      [{filledNums.join(", ")}]
                     </span>
                   )}
                 </span>
@@ -204,19 +228,22 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
               {/* Expanded: per-apartment editor */}
               {isOpen && (
                 <div className="px-4 pb-3 pt-1 space-y-1.5 bg-primary/[0.02] border-t border-border/20">
-                  <div className="grid grid-cols-[2rem_1fr_1.3fr_2rem] gap-1.5 text-[11px] text-muted-foreground font-semibold mb-1 px-1">
-                    <span>#</span><span>Otaq</span><span>Sahə (m²)</span><span></span>
+                  <div className="grid grid-cols-[1.5fr_0.7fr_1.3fr_2rem] gap-1.5 text-[11px] text-muted-foreground font-semibold mb-1 px-1">
+                    <span>Mənzil №</span><span>Otaq</span><span>Sahə (m²)</span><span></span>
                   </div>
                   {(f.apartments ?? []).map((apt, ai) => (
-                    <div key={ai} className="grid grid-cols-[2rem_1fr_1.3fr_2rem] gap-1.5 items-center">
-                      <span className="text-xs font-bold text-primary">
-                        {f.floor}{String(ai + 1).padStart(2, "0")}
-                      </span>
+                    <div key={ai} className="grid grid-cols-[1.5fr_0.7fr_1.3fr_2rem] gap-1.5 items-center">
+                      <Input
+                        value={apt.number}
+                        onChange={(e) => updateAptNumber(fi, ai, e.target.value)}
+                        placeholder={`məs. ${f.floor}0${ai + 1}`}
+                        className="h-6 text-xs px-1.5 font-mono"
+                      />
                       <Input type="number" min={1} max={10} value={apt.rooms}
-                        onChange={(e) => updateApt(fi, ai, "rooms", Number(e.target.value))}
+                        onChange={(e) => updateAptField(fi, ai, "rooms", Number(e.target.value))}
                         className="h-6 text-xs px-1.5" />
                       <Input type="number" min={1} step={0.01} value={apt.area}
-                        onChange={(e) => updateApt(fi, ai, "area", Number(e.target.value))}
+                        onChange={(e) => updateAptField(fi, ai, "area", Number(e.target.value))}
                         className="h-6 text-xs px-1.5" />
                       {(f.apartments?.length ?? 0) > 1 ? (
                         <button type="button" onClick={() => removeApt(fi, ai)}

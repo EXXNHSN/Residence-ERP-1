@@ -17,6 +17,7 @@ interface FloorRange {
 
 // Per-apartment config
 interface ApartmentConfig {
+  number?: string;  // manual apartment number; auto-generated if omitted
   area: number;
   rooms: number;
 }
@@ -80,11 +81,13 @@ function generateFromFloorConfig(blockId: number, floorConfig: FloorConfig[]) {
 
   for (const fc of floorConfig) {
     if (fc.apartments && fc.apartments.length > 0) {
-      // Detailed mode: each apartment has its own area & rooms
+      // Detailed mode: each apartment has its own area, rooms, and optional manual number
       fc.apartments.forEach((apt, i) => {
         apartments.push({
           blockId,
-          number: `${fc.floor}${String(i + 1).padStart(2, "0")}`,
+          number: apt.number?.trim()
+            ? apt.number.trim()
+            : `${fc.floor}${String(i + 1).padStart(2, "0")}`,
           floor: fc.floor,
           rooms: apt.rooms,
           area: String(apt.area),
