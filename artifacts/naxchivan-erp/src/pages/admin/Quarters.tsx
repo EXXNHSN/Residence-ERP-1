@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import {
   PlusCircle, Trash2, Building2, Home, ChevronDown, ChevronRight,
-  Layers, Plus, X, GitBranch,
+  Layers, Plus, X, GitBranch, ShieldAlert, Eye, EyeOff,
 } from "lucide-react";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -274,11 +274,14 @@ function BuildingRow({ building }: { building: Building }) {
 }
 
 function QuarterCard({ quarter }: { quarter: Quarter }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [buildingDialogOpen, setBuildingDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState<BuildingForm>({ name: "", blocks: [emptyBlock()] });
 
   const { data: buildings = [], isLoading } = useQuery<Building[]>({
@@ -288,8 +291,26 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => { await fetch(`${BASE()}/api/quarters/${id}`, { method: "DELETE" }); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["quarters"] }); toast({ title: "Kvartal silindi" }); },
+    mutationFn: async ({ id, password }: { id: number; password: string }) => {
+      const res = await fetch(`${BASE()}/api/quarters/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user?.username, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Xəta baş verdi" }));
+        throw new Error(err.error ?? "Silinmə uğursuz oldu");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["quarters"] });
+      setDeleteDialogOpen(false);
+      setDeletePassword("");
+      toast({ title: `${quarter.name} kvartali silindi` });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Xəta", description: e.message, variant: "destructive" });
+    },
   });
 
   const createBuildingMutation = useMutation({
@@ -376,7 +397,7 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
             </div>
             <div className="flex items-center gap-1">
               {isAdmin && (
-                <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(quarter.id)} className="text-destructive h-8 w-8">
+                <Button size="icon" variant="ghost" onClick={() => setDeleteDialogOpen(true)} className="text-destructive h-8 w-8">
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               )}
@@ -433,6 +454,56 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={(o) => { setDeleteDialogOpen(o); if (!o) setDeletePassword(""); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="w-5 h-5" />
+              Kvartali Sil
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+              <strong>{quarter.name} Kvartali</strong> — {quarter.buildingCount} bina, {quarter.apartmentCount} mənzil
+              silinəcək. Bu əməliyyat geri alına bilməz.
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Admin şifrəsi ilə təsdiqlə</label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && deletePassword && deleteMutation.mutate({ id: quarter.id, password: deletePassword })}
+                  placeholder="Şifrəni daxil edin"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setDeleteDialogOpen(false); setDeletePassword(""); }}>
+                Ləğv et
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={!deletePassword || deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate({ id: quarter.id, password: deletePassword })}
+              >
+                {deleteMutation.isPending ? "Silinir..." : "Sil"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={buildingDialogOpen} onOpenChange={setBuildingDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
