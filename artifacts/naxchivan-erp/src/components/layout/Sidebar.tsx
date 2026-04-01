@@ -16,6 +16,7 @@ import {
   UserCog,
   MapPin,
   Wand2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,7 +46,9 @@ const adminNavigation = [
     name: "Admin",
     items: [
       { name: "Layihə quraşdırması", href: "/admin/setup", icon: Wand2 },
+      { name: "Mənzil konfiqürasiyası", href: "/admin/configure", icon: HomeIcon },
       { name: "İstifadəçilər", href: "/admin/users", icon: UserCog },
+      { name: "Layihə parametrləri", href: "/admin/settings", icon: SlidersHorizontal },
     ]
   }
 ];

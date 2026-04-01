@@ -23,6 +23,8 @@ import TariffsPage from "@/pages/tariffs/index";
 import AdminSetupPage from "@/pages/admin/Setup";
 import AdminUsersPage from "@/pages/admin/Users";
 import QuartersPage from "@/pages/admin/Quarters";
+import ConfigurePage from "@/pages/admin/Configure";
+import SettingsPage from "@/pages/admin/Settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +57,8 @@ function AppRoutes() {
           <Route path="/quarters" component={QuartersPage} />
           <Route path="/admin/setup" component={AdminSetupPage} />
           <Route path="/admin/users" component={AdminUsersPage} />
+          <Route path="/admin/configure" component={ConfigurePage} />
+          <Route path="/admin/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>
       </main>

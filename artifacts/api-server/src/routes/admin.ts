@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { quartersTable, blocksTable, apartmentsTable } from "@workspace/db/schema";
+import { quartersTable, blocksTable, apartmentsTable, tariffsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -111,6 +111,27 @@ router.post("/buildings", async (req, res) => {
   }
 
   res.status(201).json({ ...block, apartmentCount: apartments.length });
+});
+
+// Project settings (key-value store in tariffs table)
+router.get("/settings", async (_req, res) => {
+  const rows = await db.select().from(tariffsTable).orderBy(tariffsTable.key);
+  const map: Record<string, string> = {};
+  rows.forEach((r) => { map[r.key] = r.value; });
+  res.json(map);
+});
+
+router.post("/settings", async (req, res) => {
+  const settings: Record<string, string> = req.body;
+  for (const [key, value] of Object.entries(settings)) {
+    const existing = await db.select().from(tariffsTable).where(eq(tariffsTable.key, key)).limit(1);
+    if (existing.length > 0) {
+      await db.update(tariffsTable).set({ value: String(value), updatedAt: new Date() }).where(eq(tariffsTable.key, key));
+    } else {
+      await db.insert(tariffsTable).values({ key, value: String(value) });
+    }
+  }
+  res.json({ ok: true });
 });
 
 export default router;

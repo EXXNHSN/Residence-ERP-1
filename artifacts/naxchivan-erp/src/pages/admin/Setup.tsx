@@ -107,10 +107,18 @@ export default function AdminSetupPage() {
       <div className="p-8 max-w-lg mx-auto text-center space-y-6 mt-16">
         <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
         <h2 className="text-2xl font-bold">Layihə quraşdırıldı!</h2>
-        <p className="text-muted-foreground">Bütün məhəllə, bina və mənzillər sistemə əlavə edildi.</p>
-        <div className="flex gap-3 justify-center">
-          <Button onClick={() => nav("/blocks")}>Binaları gör</Button>
-          <Button variant="outline" onClick={() => nav("/apartments")}>Mənzillər</Button>
+        <p className="text-muted-foreground">
+          Bütün məhəllə, bina və mənzillər sistemə əlavə edildi.
+          İndi hər mənzilin sahəsini (m²) və otaq sayını konfiqürasiya səhifəsindən ayrıca tənzimləyə bilərsiniz.
+        </p>
+        <div className="flex flex-col gap-3 items-center">
+          <Button onClick={() => nav("/admin/configure")} className="w-full max-w-xs gap-2">
+            Mənzil konfiqürasiyasına keç →
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => nav("/blocks")}>Binaları gör</Button>
+            <Button variant="outline" size="sm" onClick={() => nav("/apartments")}>Mənzillər</Button>
+          </div>
         </div>
       </div>
     );

@@ -67,4 +67,30 @@ router.get("/:id", async (req, res) => {
   res.json(await enrichApartment(row.apt, row.blockName ?? "", pricePerSqm));
 });
 
+router.patch("/:id", async (req, res) => {
+  const { area, rooms, number, floor, status } = req.body;
+  const updates: Partial<typeof apartmentsTable.$inferInsert> = {};
+  if (area !== undefined) updates.area = String(area);
+  if (rooms !== undefined) updates.rooms = Number(rooms);
+  if (number !== undefined) updates.number = String(number);
+  if (floor !== undefined) updates.floor = Number(floor);
+  if (status !== undefined) updates.status = status;
+
+  const [updated] = await db
+    .update(apartmentsTable)
+    .set(updates)
+    .where(eq(apartmentsTable.id, Number(req.params.id)))
+    .returning();
+
+  if (!updated) return res.status(404).json({ error: "Not found" });
+  const block = await db.select().from(blocksTable).where(eq(blocksTable.id, updated.blockId)).limit(1);
+  const pricePerSqm = await getApartmentPricePerSqm();
+  res.json(await enrichApartment(updated, block[0]?.name ?? "", pricePerSqm));
+});
+
+router.delete("/:id", async (req, res) => {
+  await db.delete(apartmentsTable).where(eq(apartmentsTable.id, Number(req.params.id)));
+  res.status(204).send();
+});
+
 export default router;
