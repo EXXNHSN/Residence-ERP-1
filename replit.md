@@ -94,3 +94,38 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+## Naxçıvan Residence ERP
+
+Full-stack property management system for a residential complex.
+
+### Features
+- Role-based auth (admin / sales) — localStorage sessions, bcryptjs password hashing
+- Quarters (məhəllə) → Buildings (bina) → Floors → Apartments hierarchy
+- Admin bulk setup wizard: create all quarters/buildings/apartments at once (`/admin/setup`)
+- Users management (`/admin/users`) — admin only
+- Installment tracking with expandable rows, overdue detection
+- Rentals, communal billing, internet subscriptions, tariffs
+- Sales with customer creation inline
+
+### Auth
+- Login: `POST /api/auth/login` → returns user object, stored in localStorage
+- Create user: `POST /api/auth/users` (admin only in practice)
+- Default admin: username=`admin`, password=`admin123`
+
+### DB Schema
+- `quarters` — residential quarters (A, B, C...)
+- `blocks` — buildings with `quarterId` FK + `floors` count
+- `apartments` — units with `rooms`, `area`, `status`
+- `users` — role: admin | sales
+- `customers`, `sales`, `installments`, `rentals`, `communal_bills`, `internet_subscriptions`, `tariffs`
+
+### Admin-only actions
+- Add/delete apartments
+- Add/delete buildings
+- Bulk setup wizard
+- User management
+- Quarters management
+
+### Routes registered in api-server
+`/quarters`, `/blocks`, `/apartments`, `/objects`, `/customers`, `/sales`, `/installments`, `/rentals`, `/communal`, `/internet`, `/tariffs`, `/stats`, `/auth`, `/admin`

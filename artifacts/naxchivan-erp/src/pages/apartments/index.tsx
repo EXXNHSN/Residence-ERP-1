@@ -12,8 +12,10 @@ import { getListApartmentsQueryKey } from "@workspace/api-client-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatArea } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ApartmentsPage() {
+  const { isAdmin } = useAuth();
   const [filterBlock, setFilterBlock] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [isOpen, setIsOpen] = useState(false);
@@ -92,6 +94,7 @@ export default function ApartmentsPage() {
               </SelectContent>
             </Select>
 
+            {isAdmin && (
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
               <DialogTrigger asChild>
                 <Button className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 shrink-0">
@@ -152,6 +155,7 @@ export default function ApartmentsPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
 

@@ -3,6 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import LoginPage from "@/pages/Login";
+import { Sidebar } from "@/components/layout/Sidebar";
 
 import Dashboard from "@/pages/Dashboard";
 import BlocksPage from "@/pages/blocks/index";
@@ -17,6 +20,9 @@ import RentalsPage from "@/pages/rentals/index";
 import CommunalPage from "@/pages/communal/index";
 import InternetPage from "@/pages/internet/index";
 import TariffsPage from "@/pages/tariffs/index";
+import AdminSetupPage from "@/pages/admin/Setup";
+import AdminUsersPage from "@/pages/admin/Users";
+import QuartersPage from "@/pages/admin/Quarters";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,39 +33,63 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router() {
+function AppRoutes() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/blocks" component={BlocksPage} />
-      <Route path="/apartments" component={ApartmentsPage} />
-      <Route path="/objects" component={ObjectsPage} />
-      
-      <Route path="/customers" component={CustomersPage} />
-      <Route path="/customers/:id" component={CustomerDetailPage} />
-      
-      <Route path="/sales" component={SalesPage} />
-      <Route path="/sales/create" component={CreateSalePage} />
-      
-      <Route path="/installments" component={InstallmentsPage} />
-      <Route path="/rentals" component={RentalsPage} />
-      <Route path="/communal" component={CommunalPage} />
-      <Route path="/internet" component={InternetPage} />
-      <Route path="/tariffs" component={TariffsPage} />
-
-      <Route component={NotFound} />
-    </Switch>
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+      <main className="flex-1 ml-72 overflow-auto">
+        <Switch>
+          <Route path="/" component={Dashboard} />
+          <Route path="/blocks" component={BlocksPage} />
+          <Route path="/apartments" component={ApartmentsPage} />
+          <Route path="/objects" component={ObjectsPage} />
+          <Route path="/customers" component={CustomersPage} />
+          <Route path="/customers/:id" component={CustomerDetailPage} />
+          <Route path="/sales" component={SalesPage} />
+          <Route path="/sales/create" component={CreateSalePage} />
+          <Route path="/installments" component={InstallmentsPage} />
+          <Route path="/rentals" component={RentalsPage} />
+          <Route path="/communal" component={CommunalPage} />
+          <Route path="/internet" component={InternetPage} />
+          <Route path="/tariffs" component={TariffsPage} />
+          <Route path="/quarters" component={QuartersPage} />
+          <Route path="/admin/setup" component={AdminSetupPage} />
+          <Route path="/admin/users" component={AdminUsersPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </main>
+    </div>
   );
+}
+
+function AuthGate() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-900">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <AppRoutes />;
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthGate />
+          </WouterRouter>
+          <Toaster />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
