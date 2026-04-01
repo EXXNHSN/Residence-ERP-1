@@ -15,12 +15,21 @@ interface FloorRange {
   rooms: number;
 }
 
-// Per-floor config (more granular than ranges)
+// Per-apartment config
+interface ApartmentConfig {
+  area: number;
+  rooms: number;
+}
+
+// Per-floor config — supports both simple (same for all) and detailed (per-apartment)
 interface FloorConfig {
   floor: number;
-  apartmentsPerFloor: number;
-  area: number;    // default area for all apts on this floor
-  rooms: number;   // default rooms for all apts on this floor
+  // Simple mode: same config for every apt on this floor
+  apartmentsPerFloor?: number;
+  area?: number;
+  rooms?: number;
+  // Detailed mode: individual config per apartment
+  apartments?: ApartmentConfig[];
 }
 
 interface BlockInput {
@@ -63,22 +72,37 @@ function generateFromRanges(blockId: number, floorRanges: FloorRange[]) {
   return apartments;
 }
 
-// Generate apartments from per-floor config (new, more granular)
+// Generate apartments from per-floor config (supports both simple and per-apartment modes)
 function generateFromFloorConfig(blockId: number, floorConfig: FloorConfig[]) {
   const apartments: {
     blockId: number; number: string; floor: number; rooms: number; area: string; status: "available";
   }[] = [];
 
   for (const fc of floorConfig) {
-    for (let apt = 1; apt <= fc.apartmentsPerFloor; apt++) {
-      apartments.push({
-        blockId,
-        number: `${fc.floor}${String(apt).padStart(2, "0")}`,
-        floor: fc.floor,
-        rooms: fc.rooms,
-        area: String(fc.area),
-        status: "available",
+    if (fc.apartments && fc.apartments.length > 0) {
+      // Detailed mode: each apartment has its own area & rooms
+      fc.apartments.forEach((apt, i) => {
+        apartments.push({
+          blockId,
+          number: `${fc.floor}${String(i + 1).padStart(2, "0")}`,
+          floor: fc.floor,
+          rooms: apt.rooms,
+          area: String(apt.area),
+          status: "available",
+        });
       });
+    } else if (fc.apartmentsPerFloor && fc.apartmentsPerFloor > 0) {
+      // Simple mode: same config for all apts on floor
+      for (let i = 1; i <= fc.apartmentsPerFloor; i++) {
+        apartments.push({
+          blockId,
+          number: `${fc.floor}${String(i).padStart(2, "0")}`,
+          floor: fc.floor,
+          rooms: fc.rooms ?? 2,
+          area: String(fc.area ?? 80),
+          status: "available",
+        });
+      }
     }
   }
   return apartments;
