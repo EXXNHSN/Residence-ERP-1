@@ -26,7 +26,7 @@ const coreNavigation = [
   {
     name: "Aktivlər",
     items: [
-      { name: "Məhəllələr", href: "/quarters", icon: MapPin },
+      { name: "Kvartallar", href: "/quarters", icon: MapPin },
       { name: "Binalar", href: "/blocks", icon: Building2 },
       { name: "Mənzillər", href: "/apartments", icon: HomeIcon },
       { name: "Obyekt / Qaraj", href: "/objects", icon: Store },

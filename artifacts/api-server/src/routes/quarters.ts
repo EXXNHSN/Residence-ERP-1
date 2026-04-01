@@ -1,44 +1,27 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { quartersTable, blocksTable, apartmentsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { quartersTable, buildingsTable, blocksTable, apartmentsTable } from "@workspace/db/schema";
+import { eq, sql, count } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/", async (_req, res) => {
   const quarters = await db
-    .select({
-      id: quartersTable.id,
-      name: quartersTable.name,
-      description: quartersTable.description,
-      createdAt: quartersTable.createdAt,
-    })
+    .select({ id: quartersTable.id, name: quartersTable.name, description: quartersTable.description, createdAt: quartersTable.createdAt })
     .from(quartersTable)
     .orderBy(quartersTable.name);
 
-  const result = await Promise.all(
-    quarters.map(async (q) => {
-      const blocks = await db
-        .select({ id: blocksTable.id })
-        .from(blocksTable)
-        .where(eq(blocksTable.quarterId, q.id));
-      const blockIds = blocks.map((b) => b.id);
-      let apartmentCount = 0;
-      if (blockIds.length > 0) {
-        const counts = await Promise.all(
-          blockIds.map(async (bid) => {
-            const [row] = await db
-              .select({ count: sql<number>`count(*)` })
-              .from(apartmentsTable)
-              .where(eq(apartmentsTable.blockId, bid));
-            return Number(row?.count ?? 0);
-          })
-        );
-        apartmentCount = counts.reduce((a, b) => a + b, 0);
-      }
-      return { ...q, buildingCount: blocks.length, apartmentCount };
-    })
-  );
+  const buildings = await db.select().from(buildingsTable);
+  const blocks = await db.select().from(blocksTable);
+  const aptCounts = await db.select({ blockId: apartmentsTable.blockId, cnt: count() }).from(apartmentsTable).groupBy(apartmentsTable.blockId);
+  const aptMap = Object.fromEntries(aptCounts.map((c) => [c.blockId, Number(c.cnt)]));
+
+  const result = quarters.map((q) => {
+    const qBuildings = buildings.filter((b) => b.quarterId === q.id);
+    const qBlocks = blocks.filter((bl) => qBuildings.some((b) => b.id === bl.buildingId) || bl.quarterId === q.id);
+    const apartmentCount = qBlocks.reduce((s, bl) => s + (aptMap[bl.id] ?? 0), 0);
+    return { ...q, buildingCount: qBuildings.length, apartmentCount };
+  });
 
   res.json(result);
 });

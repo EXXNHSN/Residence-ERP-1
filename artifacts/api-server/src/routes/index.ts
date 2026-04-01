@@ -12,6 +12,7 @@ import internetRouter from "./internet";
 import tariffsRouter from "./tariffs";
 import statsRouter from "./stats";
 import quartersRouter from "./quarters";
+import buildingsRouter from "./buildings";
 import authRouter from "./auth";
 import adminRouter from "./admin";
 
@@ -19,6 +20,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/quarters", quartersRouter);
+router.use("/buildings", buildingsRouter);
 router.use("/blocks", blocksRouter);
 router.use("/apartments", apartmentsRouter);
 router.use("/objects", objectsRouter);

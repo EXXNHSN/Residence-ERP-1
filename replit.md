@@ -101,8 +101,12 @@ Full-stack property management system for a residential complex.
 
 ### Features
 - Role-based auth (admin / sales) — localStorage sessions, bcryptjs password hashing
-- Quarters (məhəllə) → Buildings (bina) → Floors → Apartments hierarchy
-- Admin bulk setup wizard: create all quarters/buildings/apartments at once (`/admin/setup`)
+- **4-level hierarchy**: Kvartal → Bina (Building) → Blok → Apartments
+- Each block supports multiple **floor ranges** with different apt count/area/rooms per range
+- Admin bulk setup wizard: create full structure at once (`/admin/setup`)
+- Kvartal page: expandable cards showing buildings, "Yeni bina" dialog with block+floor-range config
+- Per-apartment area/rooms editor (`/admin/configure`)
+- Project reusability settings (name, city, prices) stored in tariffs key-value table
 - Users management (`/admin/users`) — admin only
 - Installment tracking with expandable rows, overdue detection
 - Rentals, communal billing, internet subscriptions, tariffs
@@ -114,18 +118,26 @@ Full-stack property management system for a residential complex.
 - Default admin: username=`admin`, password=`admin123`
 
 ### DB Schema
-- `quarters` — residential quarters (A, B, C...)
-- `blocks` — buildings with `quarterId` FK + `floors` count
-- `apartments` — units with `rooms`, `area`, `status`
+- `quarters` — residential kvartals (A, B, C...)
+- `buildings` — buildings (Bina), FK to `quarters`
+- `blocks` — blocks (Blok), FK to `buildings` (+ nullable `quarterId` for legacy)
+- `apartments` — units with `rooms`, `area`, `status`, FK to `blocks`
 - `users` — role: admin | sales
 - `customers`, `sales`, `installments`, `rentals`, `communal_bills`, `internet_subscriptions`, `tariffs`
 
 ### Admin-only actions
-- Add/delete apartments
-- Add/delete buildings
-- Bulk setup wizard
+- Add/delete kvartals, buildings, blocks
+- Bulk setup wizard with floor range configuration per block
+- Per-apartment area/rooms configuration
+- Project settings (name, city, prices)
 - User management
-- Quarters management
 
 ### Routes registered in api-server
-`/quarters`, `/blocks`, `/apartments`, `/objects`, `/customers`, `/sales`, `/installments`, `/rentals`, `/communal`, `/internet`, `/tariffs`, `/stats`, `/auth`, `/admin`
+`/quarters`, `/buildings`, `/blocks`, `/apartments`, `/objects`, `/customers`, `/sales`, `/installments`, `/rentals`, `/communal`, `/internet`, `/tariffs`, `/stats`, `/auth`, `/admin`
+
+### Key API endpoints
+- `POST /api/admin/setup` — bulk create: quarters→buildings→blocks→apartments (supports floorRanges)
+- `POST /api/admin/blocks` — add a block with floorRanges to an existing building
+- `GET/POST /api/buildings?quarterId=X` — buildings for a kvartal
+- `PATCH /api/apartments/:id` — update area, rooms, status
+- `GET/POST /api/admin/settings` — project settings key-value store
