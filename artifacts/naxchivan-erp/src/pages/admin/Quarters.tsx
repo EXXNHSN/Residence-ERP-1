@@ -75,7 +75,7 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
   const toggleFloor = (floor: number) =>
     setExpandedFloors((s) => { const n = new Set(s); n.has(floor) ? n.delete(floor) : n.add(floor); return n; });
 
-  const totalApts = block.floors.reduce((s, f) => s + f.apartments.length, 0);
+  const totalApts = block.floors.reduce((s, f) => s + (f.apartments?.length ?? 0), 0);
 
   function applyDefaults() {
     onChange({
@@ -110,7 +110,7 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
       if (fi !== floorIdx) return f;
       return {
         ...f,
-        apartments: f.apartments.map((a, ai) => ai === aptIdx ? { ...a, [field]: val } : a),
+        apartments: (f.apartments ?? []).map((a, ai) => ai === aptIdx ? { ...a, [field]: val } : a),
       };
     });
     onChange({ ...block, floors });
@@ -118,14 +118,14 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
 
   function addApt(floorIdx: number) {
     const floors = block.floors.map((f, fi) =>
-      fi === floorIdx ? { ...f, apartments: [...f.apartments, makeApt(defArea, defRooms)] } : f
+      fi === floorIdx ? { ...f, apartments: [...(f.apartments ?? []), makeApt(defArea, defRooms)] } : f
     );
     onChange({ ...block, floors });
   }
 
   function removeApt(floorIdx: number, aptIdx: number) {
     const floors = block.floors.map((f, fi) =>
-      fi === floorIdx ? { ...f, apartments: f.apartments.filter((_, ai) => ai !== aptIdx) } : f
+      fi === floorIdx ? { ...f, apartments: (f.apartments ?? []).filter((_, ai) => ai !== aptIdx) } : f
     );
     onChange({ ...block, floors });
   }
@@ -176,7 +176,7 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
       <div className="border border-border/50 rounded-xl overflow-hidden divide-y divide-border/30">
         {block.floors.map((f, fi) => {
           const isOpen = expandedFloors.has(f.floor);
-          const aptCount = f.apartments.length;
+          const aptCount = f.apartments?.length ?? 0;
           return (
             <div key={fi} className={cn("bg-background", fi % 2 === 0 ? "" : "bg-muted/10")}>
               {/* Floor header row */}
@@ -190,7 +190,7 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
                   {aptCount} mənzil
                   {aptCount > 0 && (
                     <span className="ml-2 text-[11px] text-muted-foreground/60">
-                      [{f.apartments.map((a) => `${a.rooms}o/${a.area}m²`).join(" · ")}]
+                      [{(f.apartments ?? []).map((a) => `${a.rooms}o/${a.area}m²`).join(" · ")}]
                     </span>
                   )}
                 </span>
@@ -207,7 +207,7 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
                   <div className="grid grid-cols-[2rem_1fr_1.3fr_2rem] gap-1.5 text-[11px] text-muted-foreground font-semibold mb-1 px-1">
                     <span>#</span><span>Otaq</span><span>Sahə (m²)</span><span></span>
                   </div>
-                  {f.apartments.map((apt, ai) => (
+                  {(f.apartments ?? []).map((apt, ai) => (
                     <div key={ai} className="grid grid-cols-[2rem_1fr_1.3fr_2rem] gap-1.5 items-center">
                       <span className="text-xs font-bold text-primary">
                         {f.floor}{String(ai + 1).padStart(2, "0")}
@@ -218,7 +218,7 @@ function FloorTable({ block, onChange }: { block: BlockForm; onChange: (b: Block
                       <Input type="number" min={1} step={0.01} value={apt.area}
                         onChange={(e) => updateApt(fi, ai, "area", Number(e.target.value))}
                         className="h-6 text-xs px-1.5" />
-                      {f.apartments.length > 1 ? (
+                      {(f.apartments?.length ?? 0) > 1 ? (
                         <button type="button" onClick={() => removeApt(fi, ai)}
                           className="text-destructive hover:opacity-80">
                           <X className="w-3.5 h-3.5" />
@@ -250,7 +250,7 @@ function BlockEditor({
   onChange: (b: BlockForm) => void; onRemove: () => void;
 }) {
   const [open, setOpen] = useState(idx === 0);
-  const totalApts = block.floors.reduce((s, f) => s + f.apartments.length, 0);
+  const totalApts = block.floors.reduce((s, f) => s + (f.apartments?.length ?? 0), 0);
 
   return (
     <div className="border border-border/50 rounded-xl overflow-hidden">
@@ -359,7 +359,7 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
   });
 
   const totalNewApts = form.blocks.reduce((s, bl) =>
-    s + bl.floors.reduce((fs, f) => fs + f.apartments.length, 0), 0
+    s + bl.floors.reduce((fs, f) => fs + (f.apartments?.length ?? 0), 0), 0
   );
 
   async function handleCreateBuilding() {
@@ -381,7 +381,7 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
         // Send per-apartment floorConfig to backend
         const floorConfig = bl.floors.map((f) => ({
           floor: f.floor,
-          apartments: f.apartments,
+          apartments: f.apartments ?? [],
         }));
         const blockRes = await fetch(`${BASE()}/api/admin/blocks`, {
           method: "POST",
