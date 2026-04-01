@@ -89,6 +89,32 @@ router.patch("/:id", async (req, res) => {
   res.json(await enrichApartment(updated, block[0]?.name ?? "", pricePerSqm));
 });
 
+// Admin-only edit with password verification
+router.put("/:id", async (req, res) => {
+  const { username, password, number, floor, rooms, area } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const updates: Partial<typeof apartmentsTable.$inferInsert> = {};
+  if (number !== undefined && String(number).trim()) updates.number = String(number).trim();
+  if (floor !== undefined && !isNaN(Number(floor))) updates.floor = Number(floor);
+  if (rooms !== undefined && !isNaN(Number(rooms)) && Number(rooms) >= 1) updates.rooms = Number(rooms);
+  if (area !== undefined && !isNaN(Number(area)) && Number(area) > 0) updates.area = String(Number(area));
+
+  if (Object.keys(updates).length === 0)
+    return res.status(400).json({ error: "Heç bir dəyişiklik yoxdur" });
+
+  const [updated] = await db
+    .update(apartmentsTable)
+    .set(updates)
+    .where(eq(apartmentsTable.id, Number(req.params.id)))
+    .returning();
+
+  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  const block = await db.select().from(blocksTable).where(eq(blocksTable.id, updated.blockId)).limit(1);
+  const pricePerSqm = await getApartmentPricePerSqm();
+  res.json(await enrichApartment(updated, block[0]?.name ?? "", pricePerSqm));
+});
+
 router.delete("/:id", async (req, res) => {
   await db.delete(apartmentsTable).where(eq(apartmentsTable.id, Number(req.params.id)));
   res.status(204).send();

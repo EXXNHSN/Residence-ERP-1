@@ -6,19 +6,31 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Home } from "lucide-react";
+import { Plus, Loader2, Home, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListApartmentsQueryKey } from "@workspace/api-client-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatArea } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from "@/contexts/AuthContext";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { useToast } from "@/hooks/use-toast";
+
+const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function ApartmentsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const { toast } = useToast();
   const [filterBlock, setFilterBlock] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [isOpen, setIsOpen] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingApt, setEditingApt] = useState<any>(null);
+  const [editNumber, setEditNumber] = useState("");
+  const [editFloor, setEditFloor] = useState("");
+  const [editRooms, setEditRooms] = useState("");
+  const [editArea, setEditArea] = useState("");
 
   const { data: apartments, isLoading } = useListApartments({
     blockId: filterBlock !== "all" ? Number(filterBlock) : undefined,
@@ -59,6 +71,36 @@ export default function ApartmentsPage() {
       }
     });
   };
+
+  function openEdit(apt: any) {
+    setEditingApt(apt);
+    setEditNumber(apt.number ?? "");
+    setEditFloor(String(apt.floor ?? ""));
+    setEditRooms(String(apt.rooms ?? ""));
+    setEditArea(String(apt.area ?? ""));
+    setEditOpen(true);
+  }
+
+  async function handleSaveApartment(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/apartments/${editingApt.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: user?.username,
+        password: adminPassword,
+        number: editNumber,
+        floor: Number(editFloor),
+        rooms: Number(editRooms),
+        area: Number(editArea),
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: `Mənzil #${editNumber} yeniləndi` });
+    queryClient.invalidateQueries({ queryKey: getListApartmentsQueryKey() });
+  }
 
   return (
     <AppLayout>
@@ -173,25 +215,36 @@ export default function ApartmentsPage() {
                   <TableHead>Otaq</TableHead>
                   <TableHead>Sahə</TableHead>
                   <TableHead>Status</TableHead>
+                  {isAdmin && <TableHead className="w-[60px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {apartments?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
+                    <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
                   </TableRow>
                 ) : (
                   apartments?.map((apt) => (
                     <TableRow key={apt.id} className="hover:bg-muted/30 transition-colors">
                       <TableCell className="font-medium text-muted-foreground">#{apt.id}</TableCell>
                       <TableCell className="font-semibold text-foreground">{apt.blockName}</TableCell>
-                      <TableCell className="flex items-center gap-2 font-bold">
-                        <Home className="w-4 h-4 text-primary/70" /> {apt.number}
+                      <TableCell>
+                        <div className="flex items-center gap-2 font-bold">
+                          <Home className="w-4 h-4 text-primary/70" /> {apt.number}
+                        </div>
                       </TableCell>
-                      <TableCell>{apt.floor}</TableCell>
+                      <TableCell>{apt.floor}-ci mərtəbə</TableCell>
                       <TableCell className="font-medium">{apt.rooms} otaq</TableCell>
                       <TableCell className="font-medium">{formatArea(apt.area)}</TableCell>
                       <TableCell><StatusBadge status={apt.status} type="apartment" /></TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            onClick={() => openEdit(apt)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -200,6 +253,41 @@ export default function ApartmentsPage() {
           )}
         </div>
       </div>
+
+      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
+        title="Mənzili Redaktə et" onSave={handleSaveApartment}>
+        {editingApt && (
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">
+              {editingApt.blockName} — Mənzil #{editingApt.number}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mənzil №</label>
+                <Input value={editNumber} onChange={(e) => setEditNumber(e.target.value)}
+                  className="rounded-xl h-11" placeholder="Məs: 15, 2A..." />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mərtəbə</label>
+                <Input type="number" value={editFloor} onChange={(e) => setEditFloor(e.target.value)}
+                  className="rounded-xl h-11" min="1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Otaq Sayı</label>
+                <Input type="number" value={editRooms} onChange={(e) => setEditRooms(e.target.value)}
+                  className="rounded-xl h-11" min="1" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Sahə (m²)</label>
+                <Input type="number" step="0.01" value={editArea} onChange={(e) => setEditArea(e.target.value)}
+                  className="rounded-xl h-11" min="1" />
+              </div>
+            </div>
+          </div>
+        )}
+      </AdminEditDialog>
     </AppLayout>
   );
 }
