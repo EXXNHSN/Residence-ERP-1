@@ -5,18 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Building2, Plus, Loader2, MapPin } from "lucide-react";
+import { Building2, Plus, Loader2, MapPin, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBlocksQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { useToast } from "@/hooks/use-toast";
+
+const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function BlocksPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const { toast } = useToast();
   const { data: blocks, isLoading } = useListBlocks();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
-  
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+
   const queryClient = useQueryClient();
   const { mutate: createBlock, isPending } = useCreateBlock({
     mutation: {
@@ -33,6 +42,26 @@ export default function BlocksPage() {
     if (!name) return;
     createBlock({ data: { name } });
   };
+
+  function openEdit(block: any) {
+    setEditingBlock(block);
+    setEditName(block.name);
+    setEditOpen(true);
+  }
+
+  async function handleSaveBlock(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/blocks/${editingBlock.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user?.username, password: adminPassword, name: editName }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: `"${editName}" adı yeniləndi` });
+    queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
+  }
 
   return (
     <AppLayout>
@@ -85,18 +114,21 @@ export default function BlocksPage() {
                   <TableHead>Məhəllə</TableHead>
                   <TableHead className="text-center">Mərtəbə</TableHead>
                   <TableHead className="text-right">Mənzil Sayı</TableHead>
+                  {isAdmin && <TableHead className="w-[60px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {blocks?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
+                    <TableCell colSpan={isAdmin ? 5 : 4} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
                   </TableRow>
                 ) : (
                   blocks?.map((block) => (
                     <TableRow key={block.id} className="hover:bg-muted/30 transition-colors">
-                      <TableCell className="font-semibold flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-primary" /> {block.name}
+                      <TableCell className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-primary" /> {block.name}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {(block as any).quarterName ? (
@@ -115,6 +147,15 @@ export default function BlocksPage() {
                           {block.apartmentCount}
                         </span>
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button size="icon" variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            onClick={() => openEdit(block)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -123,6 +164,21 @@ export default function BlocksPage() {
           )}
         </div>
       </div>
+
+      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
+        title="Binanı Redaktə et" onSave={handleSaveBlock}>
+        {editingBlock && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Bina adı</label>
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="rounded-xl h-11"
+              placeholder="Bina adı..."
+            />
+          </div>
+        )}
+      </AdminEditDialog>
     </AppLayout>
   );
 }
