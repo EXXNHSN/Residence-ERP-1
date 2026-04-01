@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import {
   PlusCircle, Trash2, Building2, Home, ChevronDown, ChevronRight,
-  Layers, Plus, X, GitBranch, ShieldAlert, Eye, EyeOff,
+  Layers, Plus, GitBranch, ShieldAlert, Eye, EyeOff, RefreshCw,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Quarter {
   id: number;
@@ -39,9 +42,8 @@ interface Building {
   blocks: BuildingBlock[];
 }
 
-interface FloorRange {
-  fromFloor: number;
-  toFloor: number;
+interface FloorRow {
+  floor: number;
   apartmentsPerFloor: number;
   area: number;
   rooms: number;
@@ -49,7 +51,8 @@ interface FloorRange {
 
 interface BlockForm {
   name: string;
-  floorRanges: FloorRange[];
+  totalFloors: number;
+  floors: FloorRow[];
 }
 
 interface BuildingForm {
@@ -57,13 +60,26 @@ interface BuildingForm {
   blocks: BlockForm[];
 }
 
-function emptyRange(): FloorRange {
-  return { fromFloor: 1, toFloor: 1, apartmentsPerFloor: 4, area: 80, rooms: 2 };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeFloors(count: number, apts = 4, area = 80, rooms = 2): FloorRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    floor: i + 1,
+    apartmentsPerFloor: apts,
+    area,
+    rooms,
+  }));
 }
 
-function emptyBlock(): BlockForm {
-  return { name: "", floorRanges: [emptyRange()] };
+function emptyBlock(floors = 9): BlockForm {
+  return { name: "", totalFloors: floors, floors: makeFloors(floors) };
 }
+
+function emptyBuilding(): BuildingForm {
+  return { name: "", blocks: [emptyBlock()] };
+}
+
+// ─── API fetch ────────────────────────────────────────────────────────────────
 
 async function fetchQuarters(): Promise<Quarter[]> {
   const res = await fetch(`${BASE()}/api/quarters`);
@@ -75,175 +91,199 @@ async function fetchBuildings(quarterId: number): Promise<Building[]> {
   return res.json();
 }
 
-function FloorRangeRow({
-  range,
-  idx,
-  onChange,
-  onRemove,
-  canRemove,
-}: {
-  range: FloorRange;
-  idx: number;
-  onChange: (r: FloorRange) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}) {
-  const totalFloors = range.toFloor - range.fromFloor + 1;
-  const totalApts = totalFloors > 0 ? totalFloors * range.apartmentsPerFloor : 0;
+// ─── FloorTable ──────────────────────────────────────────────────────────────
 
-  return (
-    <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Aralıq {idx + 1}
-          {totalFloors > 0 && (
-            <span className="ml-2 text-primary font-normal normal-case">
-              ({totalFloors} mərtəbə · {totalApts} mənzil)
-            </span>
-          )}
-        </span>
-        {canRemove && (
-          <button type="button" onClick={onRemove} className="text-destructive hover:opacity-80 transition">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Başlanğıc mərtəbə</label>
-          <Input
-            type="number"
-            min={1}
-            value={range.fromFloor}
-            onChange={(e) => onChange({ ...range, fromFloor: Number(e.target.value) })}
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Son mərtəbə</label>
-          <Input
-            type="number"
-            min={range.fromFloor}
-            value={range.toFloor}
-            onChange={(e) => onChange({ ...range, toFloor: Number(e.target.value) })}
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Mənzil / mərtəbə</label>
-          <Input
-            type="number"
-            min={1}
-            value={range.apartmentsPerFloor}
-            onChange={(e) => onChange({ ...range, apartmentsPerFloor: Number(e.target.value) })}
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Sahə (m²)</label>
-          <Input
-            type="number"
-            min={1}
-            step={0.5}
-            value={range.area}
-            onChange={(e) => onChange({ ...range, area: Number(e.target.value) })}
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="space-y-1 col-span-2">
-          <label className="text-xs text-muted-foreground">Otaq sayı</label>
-          <Input
-            type="number"
-            min={1}
-            value={range.rooms}
-            onChange={(e) => onChange({ ...range, rooms: Number(e.target.value) })}
-            className="h-8 text-sm"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BlockEditor({
+function FloorTable({
   block,
-  idx,
   onChange,
-  onRemove,
-  canRemove,
 }: {
   block: BlockForm;
-  idx: number;
   onChange: (b: BlockForm) => void;
-  onRemove: () => void;
-  canRemove: boolean;
 }) {
-  const totalApts = block.floorRanges.reduce((s, r) => {
-    const floors = r.toFloor - r.fromFloor + 1;
-    return s + (floors > 0 ? floors * r.apartmentsPerFloor : 0);
-  }, 0);
-  const totalFloors = block.floorRanges.reduce((m, r) => Math.max(m, r.toFloor), 0);
+  const [defaultApts, setDefaultApts] = useState(4);
+  const [defaultArea, setDefaultArea] = useState(80);
+  const [defaultRooms, setDefaultRooms] = useState(2);
+
+  const totalApts = block.floors.reduce((s, f) => s + f.apartmentsPerFloor, 0);
+
+  function applyDefaults() {
+    onChange({
+      ...block,
+      floors: block.floors.map((f) => ({ ...f, apartmentsPerFloor: defaultApts, area: defaultArea, rooms: defaultRooms })),
+    });
+  }
+
+  function updateRow(fi: number, field: keyof FloorRow, val: number) {
+    const floors = [...block.floors];
+    floors[fi] = { ...floors[fi], [field]: val };
+    onChange({ ...block, floors });
+  }
+
+  function handleTotalFloors(newCount: number) {
+    if (newCount < 1 || newCount > 99) return;
+    const existing = block.floors;
+    let floors: FloorRow[];
+    if (newCount > existing.length) {
+      floors = [
+        ...existing,
+        ...Array.from({ length: newCount - existing.length }, (_, i) => ({
+          floor: existing.length + i + 1,
+          apartmentsPerFloor: defaultApts,
+          area: defaultArea,
+          rooms: defaultRooms,
+        })),
+      ];
+    } else {
+      floors = existing.slice(0, newCount);
+    }
+    onChange({ ...block, totalFloors: newCount, floors });
+  }
 
   return (
-    <div className="border border-border/60 rounded-xl p-4 space-y-3 bg-background">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Blok adı</label>
+    <div className="space-y-3">
+      {/* Header controls */}
+      <div className="flex flex-wrap gap-2 items-end bg-muted/30 rounded-xl px-3 py-2.5">
+        <div className="space-y-1">
+          <label className="text-[11px] text-muted-foreground font-medium">Mərtəbə sayı</label>
           <Input
-            value={block.name}
-            onChange={(e) => onChange({ ...block, name: e.target.value })}
-            placeholder="A bloku"
-            className="h-8 text-sm"
+            type="number" min={1} max={99} value={block.totalFloors}
+            onChange={(e) => handleTotalFloors(Number(e.target.value))}
+            className="h-7 w-20 text-xs font-bold"
           />
         </div>
-        {canRemove && (
-          <button type="button" onClick={onRemove} className="text-destructive hover:opacity-80 mt-5">
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-      {totalFloors > 0 && (
-        <div className="text-xs text-muted-foreground flex gap-3">
-          <span className="text-primary font-medium">{totalFloors} mərtəbə</span>
-          <span>·</span>
-          <span className="text-primary font-medium">{totalApts} mənzil</span>
+        <div className="w-px h-8 bg-border mx-1 self-center" />
+        <div className="space-y-1">
+          <label className="text-[11px] text-muted-foreground font-medium">Varsayılan mənzil/mərtəbə</label>
+          <Input type="number" min={1} value={defaultApts}
+            onChange={(e) => setDefaultApts(Number(e.target.value))}
+            className="h-7 w-16 text-xs" />
         </div>
-      )}
-      <div className="space-y-2">
-        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Mərtəbə aralıqları</label>
-        {block.floorRanges.map((r, ri) => (
-          <FloorRangeRow
-            key={ri}
-            range={r}
-            idx={ri}
-            canRemove={block.floorRanges.length > 1}
-            onChange={(updated) => {
-              const ranges = [...block.floorRanges];
-              ranges[ri] = updated;
-              onChange({ ...block, floorRanges: ranges });
-            }}
-            onRemove={() => {
-              onChange({ ...block, floorRanges: block.floorRanges.filter((_, i) => i !== ri) });
-            }}
-          />
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full gap-1.5 h-7 text-xs"
-          onClick={() => onChange({ ...block, floorRanges: [...block.floorRanges, emptyRange()] })}
-        >
-          <Plus className="w-3 h-3" /> Aralıq əlavə et
+        <div className="space-y-1">
+          <label className="text-[11px] text-muted-foreground font-medium">Varsayılan sahə (m²)</label>
+          <Input type="number" min={1} step={0.5} value={defaultArea}
+            onChange={(e) => setDefaultArea(Number(e.target.value))}
+            className="h-7 w-20 text-xs" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[11px] text-muted-foreground font-medium">Varsayılan otaq</label>
+          <Input type="number" min={1} max={10} value={defaultRooms}
+            onChange={(e) => setDefaultRooms(Number(e.target.value))}
+            className="h-7 w-14 text-xs" />
+        </div>
+        <Button type="button" variant="outline" size="sm"
+          className="h-7 gap-1.5 text-xs self-end"
+          onClick={applyDefaults}>
+          <RefreshCw className="w-3 h-3" /> Hamısına tətbiq et
         </Button>
+        <div className="ml-auto self-end text-xs text-primary font-semibold">
+          Cəmi: {totalApts} mənzil
+        </div>
+      </div>
+
+      {/* Floor rows */}
+      <div className="border border-border/50 rounded-xl overflow-hidden">
+        {/* Table header */}
+        <div className="grid grid-cols-[3rem_1fr_1.2fr_1fr] gap-0 bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide border-b border-border/40">
+          <span>Mər.</span>
+          <span>Mənzil sayı</span>
+          <span>Sahə (m²)</span>
+          <span>Otaq</span>
+        </div>
+        <div className="max-h-64 overflow-y-auto divide-y divide-border/30">
+          {block.floors.map((f, fi) => (
+            <div
+              key={fi}
+              className={cn(
+                "grid grid-cols-[3rem_1fr_1.2fr_1fr] gap-0 px-3 py-1 items-center",
+                fi % 2 === 0 ? "bg-background" : "bg-muted/10"
+              )}
+            >
+              <span className="text-xs font-bold text-muted-foreground">{f.floor}</span>
+              <Input
+                type="number" min={0} max={20}
+                value={f.apartmentsPerFloor}
+                onChange={(e) => updateRow(fi, "apartmentsPerFloor", Number(e.target.value))}
+                className="h-6 text-xs border-0 bg-transparent focus:bg-background focus:border px-1 w-16"
+              />
+              <Input
+                type="number" min={1} step={0.5}
+                value={f.area}
+                onChange={(e) => updateRow(fi, "area", Number(e.target.value))}
+                className="h-6 text-xs border-0 bg-transparent focus:bg-background focus:border px-1 w-20"
+              />
+              <Input
+                type="number" min={1} max={10}
+                value={f.rooms}
+                onChange={(e) => updateRow(fi, "rooms", Number(e.target.value))}
+                className="h-6 text-xs border-0 bg-transparent focus:bg-background focus:border px-1 w-14"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
+
+// ─── BlockEditor ─────────────────────────────────────────────────────────────
+
+function BlockEditor({
+  block, idx, canRemove, onChange, onRemove,
+}: {
+  block: BlockForm; idx: number; canRemove: boolean;
+  onChange: (b: BlockForm) => void; onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(idx === 0);
+  const totalApts = block.floors.reduce((s, f) => s + f.apartmentsPerFloor, 0);
+
+  return (
+    <div className="border border-border/50 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 px-3 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+        <GitBranch className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+        <span className="font-medium text-sm flex-1">
+          {block.name || `Blok ${idx + 1}`}
+        </span>
+        {block.totalFloors > 0 && (
+          <span className="text-xs text-muted-foreground">{block.totalFloors} mərtəbə · {totalApts} mənzil</span>
+        )}
+        {canRemove && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="text-destructive hover:opacity-80 ml-2 flex-shrink-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </button>
+
+      {open && (
+        <div className="p-3 space-y-3 border-t border-border/40">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Blok adı</label>
+            <Input
+              value={block.name}
+              onChange={(e) => onChange({ ...block, name: e.target.value })}
+              placeholder={`Blok ${idx + 1} (məs. A bloku, Şimali blok)`}
+              className="h-8 text-sm"
+            />
+          </div>
+          <FloorTable block={block} onChange={onChange} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── BuildingRow (expanded view inside quarter card) ──────────────────────────
 
 function BuildingRow({ building }: { building: Building }) {
   const [expanded, setExpanded] = useState(false);
-
   return (
     <div className="border border-border/60 rounded-lg overflow-hidden">
       <button
@@ -273,6 +313,8 @@ function BuildingRow({ building }: { building: Building }) {
   );
 }
 
+// ─── QuarterCard ─────────────────────────────────────────────────────────────
+
 function QuarterCard({ quarter }: { quarter: Quarter }) {
   const { isAdmin, user } = useAuth();
   const qc = useQueryClient();
@@ -282,7 +324,8 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState<BuildingForm>({ name: "", blocks: [emptyBlock()] });
+  const [form, setForm] = useState<BuildingForm>(emptyBuilding());
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: buildings = [], isLoading } = useQuery<Building[]>({
     queryKey: ["buildings", quarter.id],
@@ -308,83 +351,53 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
       setDeletePassword("");
       toast({ title: `${quarter.name} kvartali silindi` });
     },
-    onError: (e: Error) => {
-      toast({ title: "Xəta", description: e.message, variant: "destructive" });
-    },
+    onError: (e: Error) => toast({ title: "Xəta", description: e.message, variant: "destructive" }),
   });
 
-  const createBuildingMutation = useMutation({
-    mutationFn: async (data: { quarterId: number; name: string; blocks: BlockForm[] }) => {
-      const res = await fetch(`${BASE()}/api/admin/setup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quarters: [{
-            name: quarter.name,
-            description: quarter.description,
-            _existingQuarterId: data.quarterId,
-            buildings: [{ name: data.name, blocks: data.blocks }],
-          }],
-        }),
-      });
-      if (!res.ok) throw new Error("Bina yaradılmadı");
-
-      // Use the dedicated buildings endpoint to just create the building + blocks
-      const buildRes = await fetch(`${BASE()}/api/admin/setup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quarterId: data.quarterId, name: data.name, blocks: data.blocks }),
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["quarters"] });
-      qc.invalidateQueries({ queryKey: ["buildings", quarter.id] });
-      setBuildingDialogOpen(false);
-      setForm({ name: "", blocks: [emptyBlock()] });
-      toast({ title: "Bina yaradıldı" });
-    },
-    onError: () => toast({ title: "Xəta", description: "Bina yaradılmadı", variant: "destructive" }),
-  });
-
-  const totalApts = form.blocks.reduce((bs, bl) =>
-    bs + bl.floorRanges.reduce((s, r) => s + Math.max(0, r.toFloor - r.fromFloor + 1) * r.apartmentsPerFloor, 0), 0
+  const totalNewApts = form.blocks.reduce((s, bl) =>
+    s + bl.floors.reduce((fs, f) => fs + f.apartmentsPerFloor, 0), 0
   );
 
-  function handleCreateBuilding() {
-    if (!form.name.trim()) return;
+  async function handleCreateBuilding() {
+    if (!form.name.trim()) { toast({ title: "Bina adını daxil edin", variant: "destructive" }); return; }
     for (const bl of form.blocks) {
       if (!bl.name.trim()) { toast({ title: "Blok adını daxil edin", variant: "destructive" }); return; }
     }
 
-    // Use the buildings API + admin/blocks for each block
-    (async () => {
+    setIsCreating(true);
+    try {
       const buildRes = await fetch(`${BASE()}/api/buildings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quarterId: quarter.id, name: form.name }),
       });
-      if (!buildRes.ok) { toast({ title: "Xəta", variant: "destructive" }); return; }
+      if (!buildRes.ok) throw new Error("Bina yaradılmadı");
       const building = await buildRes.json();
 
       for (const bl of form.blocks) {
-        await fetch(`${BASE()}/api/admin/blocks`, {
+        const blockRes = await fetch(`${BASE()}/api/admin/blocks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             buildingId: building.id,
             quarterId: quarter.id,
             name: bl.name,
-            floorRanges: bl.floorRanges,
+            floorConfig: bl.floors,
           }),
         });
+        if (!blockRes.ok) throw new Error(`${bl.name} yaradılmadı`);
       }
 
       qc.invalidateQueries({ queryKey: ["quarters"] });
       qc.invalidateQueries({ queryKey: ["buildings", quarter.id] });
       setBuildingDialogOpen(false);
-      setForm({ name: "", blocks: [emptyBlock()] });
-      toast({ title: `${form.name} binası yaradıldı`, description: `${totalApts} mənzil sisteme əlavə edildi` });
-    })();
+      setForm(emptyBuilding());
+      toast({ title: `${form.name} binası yaradıldı`, description: `${totalNewApts} mənzil əlavə edildi` });
+    } catch (e: any) {
+      toast({ title: "Xəta", description: e.message, variant: "destructive" });
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   return (
@@ -395,13 +408,11 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-display font-bold text-xl">
               {quarter.name}
             </div>
-            <div className="flex items-center gap-1">
-              {isAdmin && (
-                <Button size="icon" variant="ghost" onClick={() => setDeleteDialogOpen(true)} className="text-destructive h-8 w-8">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              )}
-            </div>
+            {isAdmin && (
+              <Button size="icon" variant="ghost" onClick={() => setDeleteDialogOpen(true)} className="text-destructive h-8 w-8">
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
           </div>
 
           <h3 className="font-bold text-lg">{quarter.name} Kvartali</h3>
@@ -419,23 +430,14 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
           </div>
 
           <div className="mt-4 flex items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7 flex-1"
+              onClick={() => setExpanded((v) => !v)}>
+              {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              Binaları gör
+            </Button>
             {isAdmin && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs h-7 flex-1"
-                onClick={() => { setExpanded((v) => !v); }}
-              >
-                {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                Binaları gör
-              </Button>
-            )}
-            {isAdmin && (
-              <Button
-                size="sm"
-                className="gap-1.5 text-xs h-7 flex-1"
-                onClick={() => setBuildingDialogOpen(true)}
-              >
+              <Button size="sm" className="gap-1.5 text-xs h-7 flex-1"
+                onClick={() => setBuildingDialogOpen(true)}>
                 <Plus className="w-3.5 h-3.5" /> Yeni bina
               </Button>
             )}
@@ -455,12 +457,12 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
         </CardContent>
       </Card>
 
+      {/* ── Delete confirmation dialog ── */}
       <Dialog open={deleteDialogOpen} onOpenChange={(o) => { setDeleteDialogOpen(o); if (!o) setDeletePassword(""); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
-              <ShieldAlert className="w-5 h-5" />
-              Kvartali Sil
+              <ShieldAlert className="w-5 h-5" /> Kvartali Sil
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -479,11 +481,8 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
                   placeholder="Şifrəni daxil edin"
                   className="pr-10"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
+                <button type="button" onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -492,12 +491,9 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
               <Button variant="outline" className="flex-1" onClick={() => { setDeleteDialogOpen(false); setDeletePassword(""); }}>
                 Ləğv et
               </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
+              <Button variant="destructive" className="flex-1"
                 disabled={!deletePassword || deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate({ id: quarter.id, password: deletePassword })}
-              >
+                onClick={() => deleteMutation.mutate({ id: quarter.id, password: deletePassword })}>
                 {deleteMutation.isPending ? "Silinir..." : "Sil"}
               </Button>
             </div>
@@ -505,8 +501,9 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
         </DialogContent>
       </Dialog>
 
+      {/* ── Building creation dialog ── */}
       <Dialog open={buildingDialogOpen} onOpenChange={setBuildingDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-primary" />
@@ -520,10 +517,9 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="A"
+                placeholder="A, B, C-1, Şimali bina..."
                 className="text-base"
               />
-              <p className="text-xs text-muted-foreground">Məs: A, B, C-1, Şimali bina</p>
             </div>
 
             <div className="space-y-3">
@@ -531,22 +527,15 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
                 <label className="text-sm font-medium flex items-center gap-2">
                   <Layers className="w-4 h-4" /> Bloklar
                 </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-7 text-xs"
-                  onClick={() => setForm((f) => ({ ...f, blocks: [...f.blocks, emptyBlock()] }))}
-                >
+                <Button type="button" variant="outline" size="sm" className="gap-1.5 h-7 text-xs"
+                  onClick={() => setForm((f) => ({ ...f, blocks: [...f.blocks, emptyBlock()] }))}>
                   <Plus className="w-3 h-3" /> Blok əlavə et
                 </Button>
               </div>
 
               {form.blocks.map((bl, bi) => (
                 <BlockEditor
-                  key={bi}
-                  block={bl}
-                  idx={bi}
+                  key={bi} block={bl} idx={bi}
                   canRemove={form.blocks.length > 1}
                   onChange={(updated) => {
                     const blocks = [...form.blocks];
@@ -558,14 +547,14 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
               ))}
             </div>
 
-            {totalApts > 0 && (
+            {totalNewApts > 0 && (
               <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-3 text-sm text-primary font-medium">
-                Cəmi: {form.blocks.length} blok · {totalApts} mənzil yaradılacaq
+                Cəmi: {form.blocks.length} blok · {totalNewApts} mənzil yaradılacaq
               </div>
             )}
 
-            <Button className="w-full" onClick={handleCreateBuilding} disabled={!form.name.trim()}>
-              Bina yarat
+            <Button className="w-full" onClick={handleCreateBuilding} disabled={isCreating || !form.name.trim()}>
+              {isCreating ? "Yaradılır..." : "Bina yarat"}
             </Button>
           </div>
         </DialogContent>
@@ -573,6 +562,8 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
     </>
   );
 }
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function QuartersPage() {
   const { isAdmin } = useAuth();
@@ -608,7 +599,7 @@ export default function QuartersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold">Kvartallar</h1>
-          <p className="text-muted-foreground text-sm mt-1">Yaşayış kvartallarını və binalarını idarə edin</p>
+          <p className="text-muted-foreground text-sm mt-1">Kvartal → Bina → Blok → Mərtəbə → Mənzil strukturunu idarə edin</p>
         </div>
         {isAdmin && (
           <Button onClick={() => setOpen(true)} className="gap-2">
@@ -618,12 +609,10 @@ export default function QuartersPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {quarters.map((q) => (
-          <QuarterCard key={q.id} quarter={q} />
-        ))}
+        {quarters.map((q) => <QuarterCard key={q.id} quarter={q} />)}
         {quarters.length === 0 && (
           <div className="col-span-3 text-center py-16 text-muted-foreground">
-            Hələ kvartal əlavə edilməyib
+            Hələ kvartal əlavə edilməyib. "Yeni kvartal" düyməsini sıxın.
           </div>
         )}
       </div>
@@ -636,21 +625,16 @@ export default function QuartersPage() {
           <div className="space-y-4 mt-2">
             <div className="space-y-2">
               <label className="text-sm font-medium">Ad</label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="A, B, C..."
-              />
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="A, B, C..." />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Təsvir (ixtiyari)</label>
-              <Input
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Şimal bloku"
-              />
+              <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Şimal bloku" />
             </div>
-            <Button className="w-full" onClick={() => createMutation.mutate(form)} disabled={createMutation.isPending || !form.name.trim()}>
+            <Button className="w-full" onClick={() => createMutation.mutate(form)}
+              disabled={createMutation.isPending || !form.name.trim()}>
               Əlavə et
             </Button>
           </div>

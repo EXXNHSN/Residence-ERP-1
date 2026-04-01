@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
+// --- Type definitions ---
+
 interface FloorRange {
   fromFloor: number;
   toFloor: number;
@@ -13,9 +15,18 @@ interface FloorRange {
   rooms: number;
 }
 
+// Per-floor config (more granular than ranges)
+interface FloorConfig {
+  floor: number;
+  apartmentsPerFloor: number;
+  area: number;    // default area for all apts on this floor
+  rooms: number;   // default rooms for all apts on this floor
+}
+
 interface BlockInput {
   name: string;
-  floorRanges: FloorRange[];
+  floorRanges?: FloorRange[];
+  floorConfig?: FloorConfig[];
 }
 
 interface BuildingInput {
@@ -29,23 +40,18 @@ interface QuarterInput {
   buildings: BuildingInput[];
 }
 
-function generateApartments(blockId: number, floorRanges: FloorRange[]) {
+// Generate apartments from floor ranges (legacy)
+function generateFromRanges(blockId: number, floorRanges: FloorRange[]) {
   const apartments: {
-    blockId: number;
-    number: string;
-    floor: number;
-    rooms: number;
-    area: string;
-    status: "available";
+    blockId: number; number: string; floor: number; rooms: number; area: string; status: "available";
   }[] = [];
 
   for (const range of floorRanges) {
     for (let floor = range.fromFloor; floor <= range.toFloor; floor++) {
       for (let apt = 1; apt <= range.apartmentsPerFloor; apt++) {
-        const aptNumber = `${floor}${String(apt).padStart(2, "0")}`;
         apartments.push({
           blockId,
-          number: aptNumber,
+          number: `${floor}${String(apt).padStart(2, "0")}`,
           floor,
           rooms: range.rooms,
           area: String(range.area),
@@ -54,11 +60,53 @@ function generateApartments(blockId: number, floorRanges: FloorRange[]) {
       }
     }
   }
-
   return apartments;
 }
 
-// Bulk project setup — Kvartal → Bina → Blok → Floor ranges → Apartments
+// Generate apartments from per-floor config (new, more granular)
+function generateFromFloorConfig(blockId: number, floorConfig: FloorConfig[]) {
+  const apartments: {
+    blockId: number; number: string; floor: number; rooms: number; area: string; status: "available";
+  }[] = [];
+
+  for (const fc of floorConfig) {
+    for (let apt = 1; apt <= fc.apartmentsPerFloor; apt++) {
+      apartments.push({
+        blockId,
+        number: `${fc.floor}${String(apt).padStart(2, "0")}`,
+        floor: fc.floor,
+        rooms: fc.rooms,
+        area: String(fc.area),
+        status: "available",
+      });
+    }
+  }
+  return apartments;
+}
+
+function generateApartments(blockId: number, block: BlockInput) {
+  if (block.floorConfig && block.floorConfig.length > 0) {
+    return generateFromFloorConfig(blockId, block.floorConfig);
+  }
+  if (block.floorRanges && block.floorRanges.length > 0) {
+    return generateFromRanges(blockId, block.floorRanges);
+  }
+  return [];
+}
+
+function totalFloors(block: BlockInput): number {
+  if (block.floorConfig && block.floorConfig.length > 0) {
+    return block.floorConfig.reduce((m, fc) => Math.max(m, fc.floor), 0);
+  }
+  if (block.floorRanges && block.floorRanges.length > 0) {
+    return block.floorRanges.reduce((m, r) => Math.max(m, r.toFloor), 0);
+  }
+  return 1;
+}
+
+// --- Routes ---
+
+// Bulk project setup — Kvartal → Bina → Blok → Apartments
 router.post("/setup", async (req, res) => {
   const { quarters } = req.body as { quarters: QuarterInput[] };
 
@@ -85,19 +133,16 @@ router.post("/setup", async (req, res) => {
       const resultBlocks = [];
 
       for (const blData of bData.blocks) {
-        const totalFloors = blData.floorRanges.reduce((max, r) => Math.max(max, r.toFloor), 0);
-
+        const floors = totalFloors(blData);
         const [block] = await db
           .insert(blocksTable)
-          .values({ name: blData.name, buildingId: building.id, quarterId: quarter.id, floors: totalFloors })
+          .values({ name: blData.name, buildingId: building.id, quarterId: quarter.id, floors })
           .returning();
 
-        const apartments = generateApartments(block.id, blData.floorRanges);
-
+        const apartments = generateApartments(block.id, blData);
         if (apartments.length > 0) {
           await db.insert(apartmentsTable).values(apartments);
         }
-
         resultBlocks.push({ ...block, apartmentCount: apartments.length });
       }
 
@@ -110,44 +155,41 @@ router.post("/setup", async (req, res) => {
   res.status(201).json({ quarters: results });
 });
 
-// Get full project structure (kvartal → bina → blok)
+// Get full project structure
 router.get("/structure", async (_req, res) => {
   const quarters = await db.select().from(quartersTable).orderBy(quartersTable.name);
   const buildings = await db.select().from(buildingsTable).orderBy(buildingsTable.name);
   const blocks = await db.select().from(blocksTable).orderBy(blocksTable.name);
 
-  const structure = quarters.map((q) => {
-    const qBuildings = buildings.filter((b) => b.quarterId === q.id);
-    return {
-      ...q,
-      buildings: qBuildings.map((b) => ({
-        ...b,
-        blocks: blocks.filter((bl) => bl.buildingId === b.id),
-      })),
-    };
-  });
+  const structure = quarters.map((q) => ({
+    ...q,
+    buildings: buildings
+      .filter((b) => b.quarterId === q.id)
+      .map((b) => ({ ...b, blocks: blocks.filter((bl) => bl.buildingId === b.id) })),
+  }));
 
   res.json({ quarters: structure });
 });
 
-// Add a single block to a building
+// Add a single block to a building — supports both floorConfig and floorRanges
 router.post("/blocks", async (req, res) => {
-  const { buildingId, quarterId, name, floorRanges } = req.body as {
+  const { buildingId, quarterId, name, floorConfig, floorRanges } = req.body as {
     buildingId: number;
     quarterId?: number;
     name: string;
-    floorRanges: FloorRange[];
+    floorConfig?: FloorConfig[];
+    floorRanges?: FloorRange[];
   };
 
-  const totalFloors = (floorRanges || []).reduce((max: number, r: FloorRange) => Math.max(max, r.toFloor), 1);
+  const blockInput: BlockInput = { name, floorConfig, floorRanges };
+  const floors = totalFloors(blockInput);
 
   const [block] = await db
     .insert(blocksTable)
-    .values({ name, buildingId: Number(buildingId), quarterId: quarterId ? Number(quarterId) : null, floors: totalFloors })
+    .values({ name, buildingId: Number(buildingId), quarterId: quarterId ? Number(quarterId) : null, floors })
     .returning();
 
-  const apartments = generateApartments(block.id, floorRanges || []);
-
+  const apartments = generateApartments(block.id, blockInput);
   if (apartments.length > 0) {
     await db.insert(apartmentsTable).values(apartments);
   }
@@ -155,7 +197,7 @@ router.post("/blocks", async (req, res) => {
   res.status(201).json({ ...block, apartmentCount: apartments.length });
 });
 
-// Project settings (key-value store in tariffs table)
+// Project settings
 router.get("/settings", async (_req, res) => {
   const rows = await db.select().from(tariffsTable).orderBy(tariffsTable.key);
   const map: Record<string, string> = {};
