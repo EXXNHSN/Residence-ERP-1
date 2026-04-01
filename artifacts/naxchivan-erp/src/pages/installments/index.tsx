@@ -29,7 +29,10 @@ export default function InstallmentsPage() {
     mutation: {
       onSuccess: () => {
         setPayDialog({ isOpen: false, installmentId: null });
+        // Refresh installments, sales, and customers so paidAmount updates everywhere
         queryClient.invalidateQueries({ queryKey: getListInstallmentsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ["sales"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
       }
     }
   });

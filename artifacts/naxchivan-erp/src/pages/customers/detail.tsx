@@ -3,9 +3,10 @@ import { useGetCustomer } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
-import { Loader2, ArrowLeft, User, Phone, MapPin, Hash } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, MapPin, Hash } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
 export default function CustomerDetailPage() {
@@ -83,18 +84,38 @@ export default function CustomerDetailPage() {
                       <TableHead>Tarix</TableHead>
                       <TableHead>Aktiv</TableHead>
                       <TableHead>Növ</TableHead>
-                      <TableHead>Məbləğ</TableHead>
-                      <TableHead>Ödənilib</TableHead>
+                      <TableHead className="text-right">Ümumi</TableHead>
+                      <TableHead className="text-right">Ödənilib</TableHead>
+                      <TableHead className="text-right">Qalıq Borc</TableHead>
+                      <TableHead className="w-[100px]">İrəliləyiş</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {customer.sales.map((sale) => (
+                    {customer.sales.map((sale: any) => (
                       <TableRow key={sale.id}>
                         <TableCell className="text-sm">{format(new Date(sale.saleDate), 'dd.MM.yyyy')}</TableCell>
                         <TableCell className="font-medium">{sale.assetDescription}</TableCell>
                         <TableCell><StatusBadge status={sale.saleType} /></TableCell>
-                        <TableCell className="font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
-                        <TableCell className="text-emerald-600 font-medium">{formatCurrency(sale.paidAmount)}</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-bold text-emerald-600">{formatCurrency(sale.paidAmount)}</span>
+                          {sale.saleType === 'credit' && sale.downPayment > 0 && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                              İlkin: {formatCurrency(sale.downPayment)}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-semibold ${sale.remainingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {formatCurrency(sale.remainingAmount)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">{sale.progressPercent ?? 0}%</span>
+                            <Progress value={sale.progressPercent ?? 0} className="h-1.5 bg-slate-100" />
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

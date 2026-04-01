@@ -37,14 +37,16 @@ export default function SalesPage() {
                   <TableHead>Müştəri</TableHead>
                   <TableHead>Aktiv</TableHead>
                   <TableHead>Növ</TableHead>
-                  <TableHead>Ümumi Məbləğ</TableHead>
-                  <TableHead className="w-[150px]">Ödəniş Vəziyyəti</TableHead>
+                  <TableHead className="text-right">Ümumi</TableHead>
+                  <TableHead className="text-right">Ödənilib</TableHead>
+                  <TableHead className="text-right">Qalıq Borc</TableHead>
+                  <TableHead className="w-[120px]">İrəliləyiş</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sales?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
                   </TableRow>
                 ) : (
                   sales?.map((sale) => (
@@ -57,12 +59,24 @@ export default function SalesPage() {
                       </TableCell>
                       <TableCell className="font-medium text-foreground">{sale.assetDescription}</TableCell>
                       <TableCell><StatusBadge status={sale.saleType} /></TableCell>
-                      <TableCell className="font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
+                      <TableCell className="text-right font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-bold text-emerald-600">{formatCurrency(sale.paidAmount)}</span>
+                        {sale.saleType === 'credit' && sale.downPayment > 0 && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            İlkin: {formatCurrency(sale.downPayment)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-semibold ${sale.remainingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {formatCurrency(sale.remainingAmount)}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs">
-                            <span className="text-emerald-600 font-medium">{Math.round(sale.progressPercent)}%</span>
-                            <span className="text-muted-foreground">{formatCurrency(sale.remainingAmount)} qalıb</span>
+                            <span className="text-muted-foreground">{Math.round(sale.progressPercent)}%</span>
                           </div>
                           <Progress value={sale.progressPercent} className="h-2 bg-slate-100" />
                         </div>

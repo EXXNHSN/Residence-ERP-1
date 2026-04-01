@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable } from "@workspace/db/schema";
-import { eq, or, ilike, sql } from "drizzle-orm";
+import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable } from "@workspace/db/schema";
+import { eq, or, ilike } from "drizzle-orm";
 
 const router = Router();
 
@@ -46,6 +46,7 @@ router.get("/:id", async (req, res) => {
 
   const enrichedSales = await Promise.all(
     sales.map(async (sale) => {
+      // Asset description
       let assetDescription = `#${sale.assetId}`;
       if (sale.assetType === "apartment") {
         const [apt] = await db
@@ -58,16 +59,37 @@ router.get("/:id", async (req, res) => {
         const [obj] = await db.select().from(objectsTable).where(eq(objectsTable.id, sale.assetId));
         if (obj) assetDescription = `${obj.type === "garage" ? "Qaraj" : "Obyekt"} ${obj.number}`;
       }
+
+      // Calculate paid amount from installments
+      const installments = await db
+        .select()
+        .from(installmentsTable)
+        .where(eq(installmentsTable.saleId, sale.id));
+
+      const paidInstallmentsTotal = installments
+        .filter((i) => i.status === "paid")
+        .reduce((sum, i) => sum + Number(i.amount), 0);
+
+      const totalAmount = Number(sale.totalAmount);
+      const downPayment = Number(sale.downPayment);
+      const paidAmount = sale.saleType === "cash"
+        ? totalAmount
+        : downPayment + paidInstallmentsTotal;
+      const remainingAmount = Math.max(0, totalAmount - paidAmount);
+      const progressPercent = totalAmount > 0
+        ? Math.round(Math.min(100, (paidAmount / totalAmount) * 100))
+        : 100;
+
       return {
         ...sale,
         customerName: `${customer.firstName} ${customer.lastName}`,
         assetDescription,
-        totalAmount: Number(sale.totalAmount),
-        downPayment: Number(sale.downPayment),
+        totalAmount,
+        downPayment,
         monthlyPayment: Number(sale.monthlyPayment),
-        paidAmount: 0,
-        remainingAmount: Number(sale.totalAmount),
-        progressPercent: 0,
+        paidAmount,
+        remainingAmount,
+        progressPercent,
         saleDate: sale.saleDate.toISOString(),
       };
     })
