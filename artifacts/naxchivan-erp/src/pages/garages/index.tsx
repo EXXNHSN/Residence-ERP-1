@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Car, Settings2, Loader2, Building2, CheckCircle2, Lock, Key, Layers, Trash2, ShieldAlert } from "lucide-react";
+import { Car, Settings2, Loader2, Building2, CheckCircle2, Lock, Key, Layers, Trash2, ShieldAlert, CheckSquare, Square } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListObjectsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,35 +17,48 @@ import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
-function SpotCard({ spot, onAction, deleteMode, onDelete }: {
+function SpotCard({
+  spot,
+  onAction,
+  deleteMode,
+  selected,
+  onToggleSelect,
+}: {
   spot: any;
   onAction: (spot: any) => void;
   deleteMode?: boolean;
-  onDelete?: (spot: any) => void;
+  selected?: boolean;
+  onToggleSelect?: (spot: any) => void;
 }) {
   const colors: Record<string, string> = {
     available: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
     sold: "bg-rose-50 border-rose-200 text-rose-700",
     rented: "bg-indigo-50 border-indigo-200 text-indigo-700",
   };
-  const icons: Record<string, any> = {
+  const statusIcons: Record<string, any> = {
     available: CheckCircle2,
     sold: Lock,
     rented: Key,
   };
-  const Icon = icons[spot.status] ?? Car;
+  const StatusIcon = statusIcons[spot.status] ?? Car;
 
   if (deleteMode) {
     return (
       <button
-        onClick={() => onDelete?.(spot)}
-        className="rounded-xl border-2 p-3 text-left transition-all cursor-pointer bg-red-50 border-red-200 text-red-600 hover:bg-red-100 relative group"
+        onClick={() => onToggleSelect?.(spot)}
+        className={`rounded-xl border-2 p-3 text-left transition-all cursor-pointer relative ${
+          selected
+            ? "bg-red-100 border-red-500 text-red-700 shadow-sm shadow-red-200"
+            : "bg-muted/40 border-border text-muted-foreground hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+        }`}
       >
-        <div className="flex items-center gap-1.5 mb-1">
-          <Trash2 className="w-3.5 h-3.5 opacity-70" />
-          <span className="text-xs font-bold">{spot.number}</span>
+        <div className="flex items-center gap-1 mb-1">
+          {selected
+            ? <CheckSquare className="w-3 h-3 text-red-600 flex-shrink-0" />
+            : <Square className="w-3 h-3 opacity-40 flex-shrink-0" />}
+          <span className="text-xs font-bold truncate">{spot.number}</span>
         </div>
-        <div className="text-xs opacity-70">
+        <div className="text-xs opacity-60">
           {spot.status === "available" ? "Boş" : spot.status === "sold" ? "Satılıb" : "İcarədə"}
         </div>
       </button>
@@ -59,7 +72,7 @@ function SpotCard({ spot, onAction, deleteMode, onDelete }: {
       className={`rounded-xl border-2 p-3 text-left transition-all group ${colors[spot.status] ?? "bg-muted border-border"} ${spot.status === "available" ? "cursor-pointer" : "cursor-default opacity-80"}`}
     >
       <div className="flex items-center gap-1.5 mb-1">
-        <Icon className="w-3.5 h-3.5" />
+        <StatusIcon className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="text-xs font-bold">{spot.number}</span>
       </div>
       <div className="text-xs opacity-70">
@@ -80,13 +93,18 @@ export default function GaragesPage() {
 
   const [filterKvartal, setFilterKvartal] = useState("all");
   const [filterBlock, setFilterBlock] = useState("all");
-  const [deleteMode, setDeleteMode] = useState(false);
-  const [deleteSpot, setDeleteSpot] = useState<any | null>(null);
 
+  // Delete mode state
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Setup dialog state
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupKvartal, setSetupKvartal] = useState("all");
   const [setupBlock, setSetupBlock] = useState("");
   const [setupSpots, setSetupSpots] = useState("10");
+  const [setupFloors, setSetupFloors] = useState("2");
   const [setupLoading, setSetupLoading] = useState(false);
 
   const uniqueKvartals = useMemo(() => {
@@ -128,8 +146,18 @@ export default function GaragesPage() {
     });
   }, [garages, filterKvartal, filterBlock, blocks]);
 
-  const floor1 = useMemo(() => filteredGarages.filter((g: any) => g.parkingFloor === 1 || (!g.parkingFloor && true)), [filteredGarages]);
-  const floor2 = useMemo(() => filteredGarages.filter((g: any) => g.parkingFloor === 2), [filteredGarages]);
+  // Group by floor
+  const floorGroups = useMemo(() => {
+    const map = new Map<number, any[]>();
+    filteredGarages.forEach((g: any) => {
+      const floor = g.parkingFloor ?? 1;
+      const arr = map.get(floor) ?? [];
+      arr.push(g);
+      map.set(floor, arr);
+    });
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [filteredGarages]);
+
   const hasFloorData = filteredGarages.some((g: any) => g.parkingFloor);
 
   const stats = useMemo(() => ({
@@ -139,6 +167,29 @@ export default function GaragesPage() {
     rented: filteredGarages.filter((g: any) => g.status === "rented").length,
   }), [filteredGarages]);
 
+  function toggleSelect(spot: any) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(spot.id)) next.delete(spot.id);
+      else next.add(spot.id);
+      return next;
+    });
+  }
+
+  function enterDeleteMode() {
+    setDeleteMode(true);
+    setSelectedIds(new Set());
+  }
+
+  function exitDeleteMode() {
+    setDeleteMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(filteredGarages.map((g: any) => g.id)));
+  }
+
   async function handleSetup() {
     if (!setupBlock || !setupSpots) {
       toast({ title: "Xəta", description: "Blok və yer sayını seçin", variant: "destructive" });
@@ -146,17 +197,18 @@ export default function GaragesPage() {
     }
     setSetupLoading(true);
     try {
+      const floors = Math.max(1, Math.min(10, Number(setupFloors) || 2));
       const res = await fetch(`${BASE()}/api/objects/garage-setup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blockId: Number(setupBlock), spotsPerFloor: Number(setupSpots), floors: 2 }),
+        body: JSON.stringify({ blockId: Number(setupBlock), spotsPerFloor: Number(setupSpots), floors }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Xəta" }));
         throw new Error(err.error ?? "Xəta baş verdi");
       }
       const result = await res.json();
-      toast({ title: "Uğurlu", description: `${result.count} dayanacaq yeri yaradıldı (2 mərtəbə × ${setupSpots} yer)` });
+      toast({ title: "Uğurlu", description: `${result.count} dayanacaq yeri yaradıldı (${floors} mərtəbə × ${setupSpots} yer)` });
       queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
       setSetupOpen(false);
       const block = blocks?.find(b => b.id.toString() === setupBlock);
@@ -175,16 +227,24 @@ export default function GaragesPage() {
     toast({ title: `${spot.number} seçildi`, description: "Satış üçün Satışlar → Yeni Satış, İcarə üçün İcarə menyusuna keçin." });
   }
 
-  async function handleDeleteSpot(adminPassword: string) {
-    const res = await fetch(`${BASE()}/api/objects/${deleteSpot.id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "admin", password: adminPassword }),
-    });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? "Silmə xətası"); }
+  async function handleBulkDelete(adminPassword: string) {
+    const ids = [...selectedIds];
+    let failed = 0;
+    for (const id of ids) {
+      const res = await fetch(`${BASE()}/api/objects/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "admin", password: adminPassword }),
+      });
+      if (!res.ok) failed++;
+    }
     queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
-    toast({ title: `${deleteSpot.number} silindi` });
-    setDeleteSpot(null);
+    if (failed > 0) {
+      toast({ title: `${ids.length - failed} silindi`, description: `${failed} yer silinəmədi (bağlı qeydlər ola bilər)`, variant: "destructive" });
+    } else {
+      toast({ title: `${ids.length} dayanacaq yeri silindi` });
+    }
+    exitDeleteMode();
   }
 
   function renderSpotGrid(spots: any[]) {
@@ -196,34 +256,57 @@ export default function GaragesPage() {
             spot={spot}
             onAction={handleSpotAction}
             deleteMode={deleteMode}
-            onDelete={setDeleteSpot}
+            selected={selectedIds.has(spot.id)}
+            onToggleSelect={toggleSelect}
           />
         ))}
       </div>
     );
   }
 
+  const totalSpots = Number(setupSpots) * Number(setupFloors || 2);
+
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Avto Dayanacaq</h1>
-            <p className="text-muted-foreground mt-1">Blok altı 2 mərtəbəli avtomobil dayanacaqları</p>
+            <p className="text-muted-foreground mt-1">Blok altı çoxmərtəbəli avtomobil dayanacaqları</p>
           </div>
           {isAdmin && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant={deleteMode ? "destructive" : "outline"}
-                onClick={() => setDeleteMode(d => !d)}
-                className="rounded-xl px-4"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {deleteMode ? "Silmə Rejimindən Çıx" : "Yer Sil"}
-              </Button>
-              <Button onClick={() => setSetupOpen(true)} className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-                <Settings2 className="w-4 h-4 mr-2" /> Yeni Qurğu
-              </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {!deleteMode ? (
+                <>
+                  <Button variant="outline" onClick={enterDeleteMode} className="rounded-xl px-4 border-destructive/40 text-destructive hover:bg-destructive/5">
+                    <Trash2 className="w-4 h-4 mr-2" /> Yer Sil
+                  </Button>
+                  <Button onClick={() => setSetupOpen(true)} className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
+                    <Settings2 className="w-4 h-4 mr-2" /> Yeni Qurğu
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-muted-foreground mr-1">{selectedIds.size} seçildi</span>
+                  {selectedIds.size < filteredGarages.length && (
+                    <Button variant="outline" size="sm" onClick={selectAll} className="rounded-xl">
+                      Hamısını seç
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => setBulkDeleteOpen(true)}
+                    className="rounded-xl px-4"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> {selectedIds.size > 0 ? `${selectedIds.size} Yeri Sil` : "Yer Sil"}
+                  </Button>
+                  <Button variant="ghost" onClick={exitDeleteMode} className="rounded-xl px-4">
+                    Ləğv et
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -232,7 +315,9 @@ export default function GaragesPage() {
         {deleteMode && (
           <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
             <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-            <span><strong>Silmə rejimi aktiv.</strong> Silmək istədiyiniz dayanacaq yerinə klikləyin. Admin şifrəsi tələb olunacaq.</span>
+            <span>
+              <strong>Silmə rejimi aktiv.</strong> Silmək istədiyiniz dayanacaq yerlərini klikləyərək seçin, sonra "Sil" düyməsinə basın.
+            </span>
           </div>
         )}
 
@@ -250,31 +335,21 @@ export default function GaragesPage() {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <Select value={filterKvartal} onValueChange={v => { setFilterKvartal(v); setFilterBlock("all"); }}>
-            <SelectTrigger className="w-[160px] rounded-xl bg-card">
-              <SelectValue placeholder="Kvartal" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[160px] rounded-xl bg-card"><SelectValue placeholder="Kvartal" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Bütün Kvartallar</SelectItem>
-              {uniqueKvartals.map(q => (
-                <SelectItem key={q.id} value={q.id.toString()}>{q.name}</SelectItem>
-              ))}
+              {uniqueKvartals.map(q => <SelectItem key={q.id} value={q.id.toString()}>{q.name}</SelectItem>)}
             </SelectContent>
           </Select>
-
           <Select value={filterBlock} onValueChange={setFilterBlock}>
-            <SelectTrigger className="w-[180px] rounded-xl bg-card">
-              <SelectValue placeholder="Blok" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[180px] rounded-xl bg-card"><SelectValue placeholder="Blok" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Bütün Bloklar</SelectItem>
               {filteredBlocksForFilter.map(b => (
-                <SelectItem key={b.id} value={b.id.toString()}>
-                  {b.name} {b.quarterName ? `(${b.quarterName})` : ""}
-                </SelectItem>
+                <SelectItem key={b.id} value={b.id.toString()}>{b.name} {b.quarterName ? `(${b.quarterName})` : ""}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
           {(filterKvartal !== "all" || filterBlock !== "all") && (
             <Button variant="ghost" size="sm" className="h-9 rounded-xl text-muted-foreground"
               onClick={() => { setFilterKvartal("all"); setFilterBlock("all"); }}>
@@ -303,7 +378,7 @@ export default function GaragesPage() {
           ))}
         </div>
 
-        {/* Garage spots display */}
+        {/* Garage spots */}
         {isLoading ? (
           <div className="flex justify-center p-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
         ) : filteredGarages.length === 0 ? (
@@ -320,29 +395,36 @@ export default function GaragesPage() {
           </Card>
         ) : hasFloorData ? (
           <div className="space-y-4">
-            <Card className="border-none shadow-lg shadow-black/5">
-              <CardHeader className="border-b border-border/50 pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-primary" />
-                  Yer altı 1-ci mərtəbə (M1)
-                  <Badge variant="outline" className="ml-2 text-xs">{floor1.length} yer</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">{renderSpotGrid(floor1)}</CardContent>
-            </Card>
-
-            {floor2.length > 0 && (
-              <Card className="border-none shadow-lg shadow-black/5">
+            {floorGroups.map(([floor, spots]) => (
+              <Card key={floor} className="border-none shadow-lg shadow-black/5">
                 <CardHeader className="border-b border-border/50 pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-violet-500" />
-                    Yer altı 2-ci mərtəbə (M2)
-                    <Badge variant="outline" className="ml-2 text-xs">{floor2.length} yer</Badge>
+                    <Layers className={`w-4 h-4 ${floor === 1 ? "text-primary" : floor === 2 ? "text-violet-500" : "text-amber-500"}`} />
+                    {floor === 1 ? "Yer altı 1-ci mərtəbə" : floor === 2 ? "Yer altı 2-ci mərtəbə" : `${floor}-ci mərtəbə`}
+                    <span className="text-muted-foreground font-normal">(M{floor})</span>
+                    <Badge variant="outline" className="ml-2 text-xs">{spots.length} yer</Badge>
+                    {deleteMode && (
+                      <button
+                        onClick={() => {
+                          const floorIds = new Set(spots.map((s: any) => s.id));
+                          const allSelected = spots.every((s: any) => selectedIds.has(s.id));
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (allSelected) floorIds.forEach(id => next.delete(id));
+                            else floorIds.forEach(id => next.add(id));
+                            return next;
+                          });
+                        }}
+                        className="ml-auto text-xs text-red-500 hover:underline font-normal"
+                      >
+                        {spots.every((s: any) => selectedIds.has(s.id)) ? "Hamısını çıxar" : "Hamısını seç"}
+                      </button>
+                    )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4">{renderSpotGrid(floor2)}</CardContent>
+                <CardContent className="p-4">{renderSpotGrid(spots)}</CardContent>
               </Card>
-            )}
+            ))}
           </div>
         ) : (
           <div className="space-y-4">
@@ -373,33 +455,40 @@ export default function GaragesPage() {
         {/* Legend */}
         {filteredGarages.length > 0 && !deleteMode && (
           <div className="flex items-center gap-6 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-200 inline-block" /> Boş (klik ilə satış/icarəyə yönləndirir)</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-200 inline-block" /> Boş</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-200 inline-block" /> Satılıb</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-indigo-200 inline-block" /> İcarədə</span>
           </div>
         )}
       </div>
 
-      {/* Delete spot dialog */}
+      {/* ── Bulk Delete Confirmation ── */}
       <AdminEditDialog
-        open={!!deleteSpot}
-        onClose={() => setDeleteSpot(null)}
-        title={`Silinsin: ${deleteSpot?.number ?? ""}`}
-        saveLabel="Sil"
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        title={`${selectedIds.size} Dayanacaq Yeri Silinsin?`}
+        saveLabel={`${selectedIds.size} Yeri Sil`}
         saveVariant="destructive"
-        onSave={handleDeleteSpot}
+        onSave={handleBulkDelete}
       >
-        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-          <strong>{deleteSpot?.number}</strong> dayanacaq yeri silinəcək.
-          {deleteSpot?.status !== "available" && (
-            <div className="mt-2 font-semibold">
-              ⚠️ Bu yer hal-hazırda <em>{deleteSpot?.status === "sold" ? "satılıb" : "icarədədir"}</em>. Silinmədən əvvəl bağlı qeydlər yoxlanılmalıdır.
-            </div>
-          )}
+        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700 space-y-2">
+          <p><strong>{selectedIds.size} dayanacaq yeri</strong> silinəcək. Bu əməliyyat geri qaytarıla bilməz.</p>
+          {(() => {
+            const selected = filteredGarages.filter((g: any) => selectedIds.has(g.id));
+            const occupied = selected.filter((g: any) => g.status !== "available");
+            if (occupied.length > 0) {
+              return (
+                <p className="font-semibold">
+                  ⚠️ {occupied.length} yer hal-hazırda satılıb və ya icarədədir. Bu yerlərin silinməsi bağlı qeydləri poza bilər.
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
       </AdminEditDialog>
 
-      {/* Garage Setup Dialog */}
+      {/* ── Garage Setup Dialog ── */}
       <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
@@ -409,8 +498,8 @@ export default function GaragesPage() {
           </DialogHeader>
           <div className="space-y-5 mt-2">
             <div className="bg-primary/5 rounded-xl p-4 text-sm text-muted-foreground">
-              Seçdiyiniz blok üçün <strong>2 mərtəbəli</strong> dayanacaq yeri avtomatik yaradılacaq.
-              Hər mərtəbədə eyni sayda yer olacaq.
+              Seçdiyiniz blok üçün dayanacaq yerləri avtomatik yaradılacaq.
+              <strong className="text-foreground ml-1">Mövcud yerlər dəyişdirilmir.</strong>
             </div>
 
             <div className="space-y-2">
@@ -419,9 +508,7 @@ export default function GaragesPage() {
                 <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Kvartal seçin..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Bütün kvartallar</SelectItem>
-                  {uniqueKvartals.map(q => (
-                    <SelectItem key={q.id} value={q.id.toString()}>{q.name}</SelectItem>
-                  ))}
+                  {uniqueKvartals.map(q => <SelectItem key={q.id} value={q.id.toString()}>{q.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -440,18 +527,41 @@ export default function GaragesPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Hər mərtəbədə yer sayı</label>
-              <Input type="number" min="1" max="50" value={setupSpots}
-                onChange={e => setSetupSpots(e.target.value)} className="rounded-xl h-11" placeholder="Məs: 10" />
-              <p className="text-xs text-muted-foreground">
-                Cəmi: {Number(setupSpots) * 2} yer (2 mərtəbə × {setupSpots})
-              </p>
+            {/* Floors + Spots per floor — side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mərtəbə sayı</label>
+                <Input
+                  type="number" min="1" max="10"
+                  value={setupFloors}
+                  onChange={e => setSetupFloors(e.target.value)}
+                  className="rounded-xl h-11"
+                  placeholder="Məs: 2"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Hər mərtəbədə yer</label>
+                <Input
+                  type="number" min="1" max="100"
+                  value={setupSpots}
+                  onChange={e => setSetupSpots(e.target.value)}
+                  className="rounded-xl h-11"
+                  placeholder="Məs: 10"
+                />
+              </div>
             </div>
+
+            {/* Summary */}
+            {setupFloors && setupSpots && (
+              <div className="bg-muted/40 rounded-xl px-4 py-3 text-sm text-muted-foreground flex items-center justify-between">
+                <span>Cəmi yaranacaq yer:</span>
+                <span className="font-bold text-foreground text-base">{totalSpots}</span>
+              </div>
+            )}
 
             <Button onClick={handleSetup} disabled={setupLoading || !setupBlock} className="w-full h-12 rounded-xl">
               {setupLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Car className="w-5 h-5 mr-2" />}
-              {setupLoading ? "Yaradılır..." : `${Number(setupSpots) * 2} Dayanacaq Yeri Yarat`}
+              {setupLoading ? "Yaradılır..." : `${totalSpots} Dayanacaq Yeri Yarat`}
             </Button>
           </div>
         </DialogContent>
