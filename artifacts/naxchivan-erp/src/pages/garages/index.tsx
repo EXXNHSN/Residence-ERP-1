@@ -157,12 +157,12 @@ export default function GaragesPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Qarajlar</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">Avto Dayanacaq</h1>
             <p className="text-muted-foreground mt-1">Blok altı 2 mərtəbəli avtomobil dayanacaqları</p>
           </div>
           {isAdmin && (
             <Button onClick={() => setSetupOpen(true)} className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-              <Settings2 className="w-4 h-4 mr-2" /> Qaraj Qurğusu
+              <Settings2 className="w-4 h-4 mr-2" /> Avto Dayanacaq Qurğusu
             </Button>
           )}
         </div>
@@ -244,7 +244,7 @@ export default function GaragesPage() {
               <p className="text-muted-foreground font-medium">Bu blokda dayanacaq yeri yoxdur</p>
               {isAdmin && (
                 <Button onClick={() => setSetupOpen(true)} variant="outline" className="mt-4 rounded-xl">
-                  <Settings2 className="w-4 h-4 mr-2" /> Qaraj yarat
+                  <Settings2 className="w-4 h-4 mr-2" /> Avto Dayanacaq yarat
                 </Button>
               )}
             </CardContent>
@@ -337,7 +337,7 @@ export default function GaragesPage() {
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-display flex items-center gap-2">
-              <Settings2 className="w-5 h-5 text-primary" /> Qaraj Qurğusu
+              <Settings2 className="w-5 h-5 text-primary" /> Avto Dayanacaq Qurğusu
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 mt-2">

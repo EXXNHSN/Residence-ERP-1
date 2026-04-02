@@ -120,7 +120,7 @@ export default function InstallmentsPage() {
               <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-10"></TableHead>
-                  <TableHead>Müştəri</TableHead>
+                  <TableHead>Sakin</TableHead>
                   <TableHead>Mənzil</TableHead>
                   <TableHead>Aylıq Ödəniş</TableHead>
                   <TableHead>Növbəti Tarix</TableHead>

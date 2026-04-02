@@ -110,7 +110,7 @@ export default function RentalsPage() {
       setCustomerSearch("");
       setShowCustomerSearch(false);
       refetch();
-      toast({ title: "Uğurlu", description: isGarageRental ? "Qaraj icarəsi yaradıldı. Kommunal faktura yarandığında qaraj icarəsi ayrıca göstəriləcək." : "İcarə müqaviləsi yaradıldı." });
+      toast({ title: "Uğurlu", description: isGarageRental ? "Avto dayanacaq icarəsi yaradıldı. Kommunal faktura yarandığında ayrıca göstəriləcək." : "İcarə müqaviləsi yaradıldı." });
     } else {
       const err = await res.json().catch(() => ({ error: "Xəta" }));
       toast({ title: "Xəta", description: err.error, variant: "destructive" });
@@ -165,7 +165,7 @@ export default function RentalsPage() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">İcarələr</h1>
-            <p className="text-muted-foreground mt-1">Obyekt və qarajların icarə müqavilələri</p>
+            <p className="text-muted-foreground mt-1">Qeyri yaşayış sahəsi və avto dayanacaq icarə müqavilələri</p>
           </div>
           <Dialog open={isOpen} onOpenChange={v => { setIsOpen(v); if (!v) { reset(); setCustomerSearch(""); setShowCustomerSearch(false); } }}>
             <DialogTrigger asChild>
@@ -182,7 +182,7 @@ export default function RentalsPage() {
                 <div className="bg-muted/40 rounded-xl p-4 space-y-3">
                   <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">İcarə Obyekti</p>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Obyekt / Qaraj</label>
+                    <label className="text-sm font-medium">Qeyri Yaşayış / Avto Dayanacaq</label>
                     <Controller name="assetId" control={control} rules={{ required: true }}
                       render={({ field }) => (
                         <Select onValueChange={v => { field.onChange(v); }} value={field.value}>
@@ -192,7 +192,7 @@ export default function RentalsPage() {
                           <SelectContent>
                             {objects?.filter((o: any) => o.type === "object").length > 0 && (
                               <>
-                                <div className="px-2 py-1 text-xs text-muted-foreground font-semibold">── Ticarət Obyektləri</div>
+                                <div className="px-2 py-1 text-xs text-muted-foreground font-semibold">── Qeyri Yaşayış</div>
                                 {objects?.filter((o: any) => o.type === "object").map((o: any) => (
                                   <SelectItem key={o.id} value={o.id.toString()}>
                                     <span className="flex items-center gap-1.5"><Store className="w-3.5 h-3.5 text-amber-500" /> Obyekt {o.number} {o.area ? `— ${o.area} m²` : ""}</span>
@@ -202,10 +202,10 @@ export default function RentalsPage() {
                             )}
                             {objects?.filter((o: any) => o.type === "garage").length > 0 && (
                               <>
-                                <div className="px-2 py-1 text-xs text-muted-foreground font-semibold">── Qarajlar / Dayanacaq</div>
+                                <div className="px-2 py-1 text-xs text-muted-foreground font-semibold">── Avto Dayanacaq</div>
                                 {objects?.filter((o: any) => o.type === "garage").map((o: any) => (
                                   <SelectItem key={o.id} value={o.id.toString()}>
-                                    <span className="flex items-center gap-1.5"><Car className="w-3.5 h-3.5 text-indigo-500" /> Qaraj {o.number} {o.blockName ? `(${o.blockName})` : ""}</span>
+                                    <span className="flex items-center gap-1.5"><Car className="w-3.5 h-3.5 text-indigo-500" /> Avto Dayanacaq {o.number} {o.blockName ? `(${o.blockName})` : ""}</span>
                                   </SelectItem>
                                 ))}
                               </>
@@ -219,7 +219,7 @@ export default function RentalsPage() {
                   {selectedObj && (
                     <div className={`text-xs rounded-lg px-3 py-2 flex items-center gap-2 ${isGarageRental ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-primary/10 text-primary"}`}>
                       {isGarageRental ? (
-                        <><Car className="w-3.5 h-3.5" /> Qaraj sabit aylıq icarə: <strong>{formatCurrency((selectedObj as any).monthlyRent ?? 100)}</strong></>
+                        <><Car className="w-3.5 h-3.5" /> Avto dayanacaq sabit aylıq icarə: <strong>{formatCurrency((selectedObj as any).monthlyRent ?? 100)}</strong></>
                       ) : (
                         <>Sahə: {(selectedObj as any).area} m² · Tarifdən hesablanmış: {formatCurrency((selectedObj as any).monthlyRent)} / ay</>
                       )}
@@ -228,7 +228,7 @@ export default function RentalsPage() {
 
                   {isGarageRental && (
                     <div className="bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700 border border-amber-200">
-                      Qaraj icarəsi kommunal fakturada <strong>ayrıca sətir</strong> kimi göstəriləcək.
+                      Avto dayanacaq icarəsi kommunal fakturada <strong>ayrıca sətir</strong> kimi göstəriləcək.
                     </div>
                   )}
                 </div>
@@ -237,10 +237,10 @@ export default function RentalsPage() {
                 {isGarageRental && (
                   <div className="bg-indigo-50/50 rounded-xl border border-indigo-200 p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-indigo-800">Mövcud Müştəriyə Bağla</p>
+                      <p className="text-sm font-semibold text-indigo-800">Mövcud Sakinə Bağla</p>
                       <button type="button" onClick={() => setShowCustomerSearch(!showCustomerSearch)}
                         className="text-xs text-indigo-600 hover:underline">
-                        {showCustomerSearch ? "Ləğv et" : "Müştəri seç"}
+                        {showCustomerSearch ? "Ləğv et" : "Sakin seç"}
                       </button>
                     </div>
                     {showCustomerSearch && (
@@ -248,7 +248,7 @@ export default function RentalsPage() {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                           <Input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                            placeholder="Müştəri adı ilə axtarış..." className="rounded-xl h-9 pl-8 text-sm" />
+                            placeholder="Sakin adı ilə axtarış..." className="rounded-xl h-9 pl-8 text-sm" />
                         </div>
                         <Controller name="customerId" control={control} render={({ field }) => (
                           <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
@@ -273,7 +273,7 @@ export default function RentalsPage() {
                         <button type="button" onClick={() => { setValue("customerId", ""); setShowCustomerSearch(false); }} className="ml-1 text-indigo-500 hover:text-indigo-700">×</button>
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground">Bağlandıqda qaraj icarəsi müştərinin kommunal hesabına avtomatik əlavə ediləcək.</p>
+                    <p className="text-xs text-muted-foreground">Bağlandıqda avto dayanacaq icarəsi sakinin kommunal hesabına avtomatik əlavə ediləcək.</p>
                   </div>
                 )}
 
@@ -351,14 +351,14 @@ export default function RentalsPage() {
           <div className="flex items-center gap-6 text-sm">
             <span className="flex items-center gap-2">
               <Store className="w-4 h-4 text-amber-500" />
-              <span className="text-muted-foreground">Ticarət obyektləri:</span>
+              <span className="text-muted-foreground">Qeyri yaşayış:</span>
               <strong>{objectRentals.length}</strong>
               <span className="text-muted-foreground text-xs">({formatCurrency(objectRentals.reduce((s: number, r: any) => s + Number(r.monthlyAmount), 0))} / ay)</span>
             </span>
             <span className="text-border">·</span>
             <span className="flex items-center gap-2">
               <Car className="w-4 h-4 text-indigo-500" />
-              <span className="text-muted-foreground">Qarajlar:</span>
+              <span className="text-muted-foreground">Avto Dayanacaq:</span>
               <strong>{garageRentals.length}</strong>
               <span className="text-muted-foreground text-xs">({formatCurrency(garageRentals.reduce((s: number, r: any) => s + Number(r.monthlyAmount), 0))} / ay)</span>
             </span>
@@ -371,8 +371,8 @@ export default function RentalsPage() {
             <SelectTrigger className="w-[180px] rounded-xl bg-card"><SelectValue placeholder="Tip" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Bütün İcarələr</SelectItem>
-              <SelectItem value="object">Ticarət Obyektləri</SelectItem>
-              <SelectItem value="garage">Qarajlar</SelectItem>
+              <SelectItem value="object">Qeyri Yaşayış</SelectItem>
+              <SelectItem value="garage">Avto Dayanacaq</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -415,7 +415,7 @@ export default function RentalsPage() {
                           )}
                           {rental.customerId && (
                             <Badge variant="outline" className="text-[10px] text-indigo-600 border-indigo-200 gap-0.5">
-                              <CheckCircle2 className="w-2.5 h-2.5" /> Müştəri bağlı
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Sakin bağlı
                             </Badge>
                           )}
                         </div>
@@ -435,7 +435,7 @@ export default function RentalsPage() {
                           {rental.assetDescription}
                         </div>
                         {rental.assetType === "garage" && (
-                          <Badge className="text-[10px] bg-indigo-50 text-indigo-600 border-indigo-200 mt-0.5" variant="outline">Qaraj</Badge>
+                          <Badge className="text-[10px] bg-indigo-50 text-indigo-600 border-indigo-200 mt-0.5" variant="outline">Avto Dayanacaq</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-sm">

@@ -70,7 +70,7 @@ export default function SalesPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Satışlar</h1>
-            <p className="text-muted-foreground mt-1">Mənzil, obyekt və qaraj satışları</p>
+            <p className="text-muted-foreground mt-1">Mənzil, qeyri yaşayış və avto dayanacaq satışları</p>
           </div>
           
           <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export default function SalesPage() {
               <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Tarix</TableHead>
-                  <TableHead>Müştəri</TableHead>
+                  <TableHead>Sakin</TableHead>
                   <TableHead>Aktiv</TableHead>
                   <TableHead>Növ</TableHead>
                   <TableHead className="text-right">Ümumi</TableHead>

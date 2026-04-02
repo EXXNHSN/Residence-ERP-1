@@ -124,7 +124,7 @@ export default function ObjectsPage() {
   }), [garages]);
 
   function handleSpotAction(_spot: any) {
-    toast({ title: "Satış/İcarə", description: "Qaraj satışı üçün Satışlar → Yeni Satış, icarə üçün İcarə menyusuna keçin." });
+    toast({ title: "Satış/İcarə", description: "Avto dayanacaq satışı üçün Satışlar → Yeni Satış, icarə üçün İcarə menyusuna keçin." });
   }
 
   async function handleGarageSetup() {
@@ -155,22 +155,22 @@ export default function ObjectsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Aktivlər</h1>
-            <p className="text-muted-foreground mt-1">Ticarət obyektləri və dayanacaq yerlərinin idarəsi</p>
+            <p className="text-muted-foreground mt-1">Qeyri yaşayış sahələri və dayanacaq yerlərinin idarəsi</p>
           </div>
           <div className="flex items-center gap-2">
             {tab === "objects" && (
               <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogTrigger asChild>
                   <Button className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-                    <Plus className="w-4 h-4 mr-1.5" /> Yeni Obyekt
+                    <Plus className="w-4 h-4 mr-1.5" /> Yeni Qeyri Yaşayış
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md rounded-2xl">
-                  <DialogHeader><DialogTitle className="text-xl font-display">Yeni Ticarət Obyekti</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle className="text-xl font-display">Yeni Qeyri Yaşayış</DialogTitle></DialogHeader>
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Nömrə / Ad</label>
-                      <Input {...register("number", { required: true })} className="rounded-xl h-11" placeholder="Məs: Obyekt 1A" />
+                      <Input {...register("number", { required: true })} className="rounded-xl h-11" placeholder="Məs: Qeyri Yaşayış 1A" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Sahə (m²)</label>
@@ -204,7 +204,7 @@ export default function ObjectsPage() {
             )}
             {tab === "garages" && isAdmin && (
               <Button onClick={() => setSetupOpen(true)} className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-                <Settings2 className="w-4 h-4 mr-1.5" /> Qaraj Qurğusu
+                <Settings2 className="w-4 h-4 mr-1.5" /> Avto Dayanacaq Qurğusu
               </Button>
             )}
           </div>
@@ -214,11 +214,11 @@ export default function ObjectsPage() {
         <div className="flex gap-1 p-1 bg-muted/50 rounded-xl w-fit">
           <button onClick={() => { setTab("objects"); setFilterStatus("all"); setFilterKvartal("all"); setFilterBlock("all"); }}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${tab === "objects" ? "bg-white shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-            <Store className="w-4 h-4" /> Ticarət Obyektləri
+            <Store className="w-4 h-4" /> Qeyri Yaşayış
           </button>
           <button onClick={() => { setTab("garages"); setFilterStatus("all"); setFilterKvartal("all"); setFilterBlock("all"); }}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${tab === "garages" ? "bg-white shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-            <Car className="w-4 h-4" /> Qarajlar / Dayanacaq
+            <Car className="w-4 h-4" /> Avto Dayanacaq
           </button>
         </div>
 
@@ -260,7 +260,7 @@ export default function ObjectsPage() {
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                           <Store className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                          <p>Ticarət obyekti tapılmadı</p>
+                          <p>Qeyri yaşayış tapılmadı</p>
                         </TableCell>
                       </TableRow>
                     ) : allObjects?.map((obj: any) => (
@@ -373,7 +373,7 @@ export default function ObjectsPage() {
                   <p className="text-muted-foreground font-medium">Bu filterlər üçün dayanacaq yeri tapılmadı</p>
                   {isAdmin && filterBlock !== "all" && (
                     <Button onClick={() => setSetupOpen(true)} variant="outline" className="mt-4 rounded-xl">
-                      <Settings2 className="w-4 h-4 mr-2" /> Bu blok üçün qaraj yarat
+                      <Settings2 className="w-4 h-4 mr-2" /> Bu blok üçün avto dayanacaq yarat
                     </Button>
                   )}
                 </CardContent>
@@ -444,7 +444,7 @@ export default function ObjectsPage() {
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-display flex items-center gap-2">
-              <Settings2 className="w-5 h-5 text-primary" /> Qaraj Qurğusu
+              <Settings2 className="w-5 h-5 text-primary" /> Avto Dayanacaq Qurğusu
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">

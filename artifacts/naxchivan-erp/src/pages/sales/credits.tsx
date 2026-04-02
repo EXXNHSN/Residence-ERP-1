@@ -70,7 +70,7 @@ export default function CreditReportPage() {
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [{ wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Kredit Müştərilər");
+    XLSX.utils.book_append_sheet(wb, ws, "Kredit Sakinlər");
     XLSX.writeFile(wb, `kredit-mushteriler-${format(new Date(), "dd-MM-yyyy")}.xlsx`);
   }
 
@@ -99,7 +99,7 @@ export default function CreditReportPage() {
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { title: "Kredit Müştəri", value: creditSales.length, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+                { title: "Kredit Sakin", value: creditSales.length, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
                 { title: "Ümumi Kredit", value: formatCurrency(totalCreditAmount), icon: Wallet, color: "text-violet-600", bg: "bg-violet-50" },
                 { title: "Aylıq Gəlir", value: formatCurrency(totalMonthly), icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50" },
                 { title: "Qalıq Borc", value: formatCurrency(totalOutstanding), icon: CalendarDays, color: "text-amber-600", bg: "bg-amber-50" },
@@ -180,13 +180,13 @@ export default function CreditReportPage() {
 
             <Card className="border-none shadow-lg shadow-black/5">
               <CardHeader className="border-b border-border/50 pb-4">
-                <CardTitle className="text-base">Kredit Müştərilər Siyahısı</CardTitle>
+                <CardTitle className="text-base">Kredit Sakinlər Siyahısı</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader className="bg-muted/40">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>Müştəri</TableHead>
+                      <TableHead>Sakin</TableHead>
                       <TableHead>Aktiv</TableHead>
                       <TableHead className="text-right">Ümumi</TableHead>
                       <TableHead className="text-right">Aylıq Ödəniş</TableHead>

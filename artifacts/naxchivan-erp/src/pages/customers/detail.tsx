@@ -61,7 +61,7 @@ export default function CustomerDetailPage() {
       const err = await res.json().catch(() => ({ error: "Xəta" }));
       throw new Error(err.error ?? "Xəta baş verdi");
     }
-    toast({ title: "Müştəri məlumatları yeniləndi" });
+    toast({ title: "Sakin məlumatları yeniləndi" });
     qc.invalidateQueries({ queryKey: getGetCustomerQueryKey(Number(id)) });
   }
 
@@ -70,7 +70,7 @@ export default function CustomerDetailPage() {
   }
 
   if (isError || !customer) {
-    return <AppLayout><div className="text-center text-destructive p-12">Müştəri tapılmadı</div></AppLayout>;
+    return <AppLayout><div className="text-center text-destructive p-12">Sakin tapılmadı</div></AppLayout>;
   }
 
   return (
@@ -81,7 +81,7 @@ export default function CustomerDetailPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Müştəri Profili</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">Sakin Profili</h1>
             <p className="text-muted-foreground mt-1">#{customer.id} - {customer.firstName} {customer.lastName}</p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               {customer.sales.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">Bu müştərinin satınalması yoxdur.</div>
+                <div className="text-center py-8 text-muted-foreground">Bu sakinin satınalması yoxdur.</div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -186,7 +186,7 @@ export default function CustomerDetailPage() {
       </div>
 
       <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
-        title="Müştərini Redaktə et" onSave={handleSaveCustomer}>
+        title="Sakini Redaktə et" onSave={handleSaveCustomer}>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

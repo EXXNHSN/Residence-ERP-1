@@ -116,8 +116,8 @@ export default function CustomersPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Müştərilər</h1>
-            <p className="text-muted-foreground mt-1">CRM və müştəri məlumatları</p>
+            <h1 className="text-3xl font-display font-bold text-foreground">Sakinlər</h1>
+            <p className="text-muted-foreground mt-1">Sakin reyestri</p>
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto">
@@ -139,7 +139,7 @@ export default function CustomersPage() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-md rounded-2xl">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-display">Yeni Müştəri</DialogTitle>
+                  <DialogTitle className="text-xl font-display">Yeni Sakin</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -185,7 +185,7 @@ export default function CustomersPage() {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Müştəri</TableHead>
+                  <TableHead>Sakin</TableHead>
                   <TableHead>FIN</TableHead>
                   <TableHead>Telefon</TableHead>
                   <TableHead className="text-right">Əməliyyat</TableHead>
@@ -246,23 +246,23 @@ export default function CustomersPage() {
 
       {/* Delete dialog */}
       <AdminEditDialog open={deleteOpen} onClose={() => setDeleteOpen(false)}
-        title="Müştərini Sil" onSave={handleDeleteCustomer} saveLabel="Sil" saveVariant="destructive">
+        title="Sakini Sil" onSave={handleDeleteCustomer} saveLabel="Sil" saveVariant="destructive">
         {deletingCustomer && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Aşağıdakı müştərini silmək istədiyinizə əminsiniz?</p>
+            <p className="text-sm text-muted-foreground">Aşağıdakı sakini silmək istədiyinizə əminsiniz?</p>
             <div className="flex items-center gap-3 bg-destructive/10 text-destructive rounded-xl px-4 py-3 font-semibold">
               <User className="w-4 h-4 shrink-0" />
               {deletingCustomer.firstName} {deletingCustomer.lastName}
             </div>
             <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
-              Müştəri silinəndə ona aid bütün satışlar da silinir və satılmış mənzillər yenidən boş olaraq göstərilir.
+              Sakin silinəndə ona aid bütün satışlar da silinir və satılmış mənzillər yenidən boş olaraq göstərilir.
             </p>
           </div>
         )}
       </AdminEditDialog>
 
       <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
-        title="Müştərini Redaktə et" onSave={handleSaveCustomer}>
+        title="Sakini Redaktə et" onSave={handleSaveCustomer}>
         {editingCustomer && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">

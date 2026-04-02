@@ -273,7 +273,7 @@ export default function CreateSalePage() {
           </Link>
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Yeni Satış</h1>
-            <p className="text-muted-foreground mt-1">Müştəri məlumatları və aktiv satışı</p>
+            <p className="text-muted-foreground mt-1">Sakin məlumatları və aktiv satışı</p>
           </div>
         </div>
 
@@ -337,7 +337,7 @@ export default function CreateSalePage() {
                         <SelectContent>
                           <SelectItem value={CreateSaleInputAssetType.apartment}>Mənzil</SelectItem>
                           <SelectItem value={CreateSaleInputAssetType.object}>Obyekt</SelectItem>
-                          <SelectItem value={CreateSaleInputAssetType.garage}>Qaraj</SelectItem>
+                          <SelectItem value={CreateSaleInputAssetType.garage}>Avto Dayanacaq</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -493,7 +493,7 @@ export default function CreateSalePage() {
                                     <>
                                       <div className="flex items-center justify-between mb-1">
                                         <span className="text-xs font-semibold text-primary truncate">
-                                          {watchAssetType === 'garage' ? 'Qaraj' : 'Obyekt'}
+                                          {watchAssetType === 'garage' ? 'Avto Dayanacaq' : 'Obyekt'}
                                         </span>
                                         {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
                                       </div>

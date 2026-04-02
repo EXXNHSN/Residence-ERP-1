@@ -14,7 +14,7 @@ const SETTINGS_KEYS = [
   { key: "project_tagline", label: "Layihə Sloqanı", placeholder: "ERP Sistemi", desc: "Login səhifəsindəki kiçik yazı" },
   { key: "project_city", label: "Şəhər / Region", placeholder: "Naxçıvan", desc: "İxtiyari — hesabat başlıqları üçün" },
   { key: "apartment_price_per_sqm", label: "Mənzil qiyməti (m² başına, AZN)", placeholder: "1000", desc: "Mənzil siyahısında avtomatik qiymət hesablanır" },
-  { key: "garage_price_per_sqm", label: "Qaraj qiyməti (m² başına, AZN)", placeholder: "500", desc: "Qaraj satışı üçün standart qiymət" },
+  { key: "garage_price_per_sqm", label: "Avto Dayanacaq qiyməti (m² başına, AZN)", placeholder: "500", desc: "Avto dayanacaq satışı üçün standart qiymət" },
   { key: "communal_tariff", label: "Kommunal norma (m² başına, AZN/ay)", placeholder: "0.8", desc: "Kommunal hesabat üçün standart tarif" },
 ];
 
