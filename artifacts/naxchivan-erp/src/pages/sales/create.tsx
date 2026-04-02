@@ -155,9 +155,13 @@ export default function CreateSalePage() {
 
   useEffect(() => {
     if (!tariffs || !watchAssetType) return;
+    if (watchAssetType === 'garage') {
+      // For garages, use fixed sale price (not area-based)
+      setValue('pricePerSqm', ((tariffs as any).garageSalePrice ?? 5000).toString());
+      return;
+    }
     if (watchAssetType !== 'apartment') {
       if (watchAssetType === 'object') setValue('pricePerSqm', tariffs.objectPricePerSqm.toString());
-      if (watchAssetType === 'garage') setValue('pricePerSqm', tariffs.garagePricePerSqm.toString());
       return;
     }
     if (!watchAssetId) {
@@ -174,16 +178,22 @@ export default function CreateSalePage() {
   const [calcResult, setCalcResult] = useState({ total: 0, monthly: 0 });
 
   useEffect(() => {
-    let area = 0;
-    if (watchAssetId) {
-      if (watchAssetType === 'apartment') {
-        area = apartments?.find((a: any) => a.id.toString() === watchAssetId)?.area || 0;
-      } else {
-        area = objects?.find((o: any) => o.id.toString() === watchAssetId)?.area || 0;
+    let totalAmount = 0;
+    if (watchAssetType === 'garage') {
+      // Fixed price for garages
+      totalAmount = Number(watchPrice) || 0;
+    } else {
+      let area = 0;
+      if (watchAssetId) {
+        if (watchAssetType === 'apartment') {
+          area = apartments?.find((a: any) => a.id.toString() === watchAssetId)?.area || 0;
+        } else {
+          area = objects?.find((o: any) => o.id.toString() === watchAssetId)?.area || 0;
+        }
       }
+      const price = Number(watchPrice) || 0;
+      totalAmount = area * price;
     }
-    const price = Number(watchPrice) || 0;
-    const totalAmount = area * price;
     let monthly = 0;
     if (watchSaleType === 'credit') {
       const dp = Number(watchDownPayment) || 0;
@@ -205,16 +215,18 @@ export default function CreateSalePage() {
           address: data.address || undefined,
         }
       });
+      const isGarage = data.assetType === 'garage';
       createSale({
         data: {
           customerId: customer.id,
           assetType: data.assetType,
           assetId: Number(data.assetId),
           saleType: data.saleType,
-          pricePerSqm: Number(data.pricePerSqm),
+          pricePerSqm: isGarage ? 0 : Number(data.pricePerSqm),
           downPayment: data.saleType === 'credit' ? Number(data.downPayment) : 0,
           installmentMonths: data.saleType === 'credit' ? Number(data.installmentMonths) : undefined,
-        }
+          ...(isGarage ? { totalAmountOverride: calcResult.total } : {}),
+        } as any
       });
     } catch {
       setIsSubmitting(false);
@@ -525,16 +537,26 @@ export default function CreateSalePage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-1.5">
-                      1 m² Qiyməti (AZN)
-                      {watchAssetId && watchAssetType === 'apartment' && (
-                        <span className="text-[10px] font-normal text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-                          <Zap className="w-2.5 h-2.5" /> avtomatik
+                      {watchAssetType === 'garage' ? (
+                        <span className="flex items-center gap-1.5">Sabit Qiymət (AZN)
+                          <span className="text-[10px] font-normal text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                            <Zap className="w-2.5 h-2.5" /> sabit
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5">1 m² Qiyməti (AZN)
+                          {watchAssetId && watchAssetType === 'apartment' && (
+                            <span className="text-[10px] font-normal text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                              <Zap className="w-2.5 h-2.5" /> avtomatik
+                            </span>
+                          )}
                         </span>
                       )}
                     </label>
                     <Input type="number" step="0.01" {...register("pricePerSqm", { required: true })}
                       className="rounded-xl h-12 bg-slate-50"
-                      placeholder="El ilə daxil edə bilərsiniz" />
+                      placeholder={watchAssetType === 'garage' ? 'Tarifdən avtomatik' : 'El ilə daxil edə bilərsiniz'}
+                      readOnly={watchAssetType === 'garage'} />
                   </div>
                 </div>
 

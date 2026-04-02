@@ -108,10 +108,22 @@ router.post("/calculate", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { customerId, assetType, assetId, saleType, downPayment, installmentMonths, pricePerSqm } = req.body;
+  const { customerId, assetType, assetId, saleType, downPayment, installmentMonths, pricePerSqm, totalAmountOverride } = req.body;
 
   const asset = await getAssetInfo(assetType, assetId);
-  const totalAmount = asset.area * Number(pricePerSqm);
+
+  // For garages, use fixed price from tariffs (area is 0)
+  let totalAmount: number;
+  if (assetType === "garage" || totalAmountOverride) {
+    if (totalAmountOverride) {
+      totalAmount = Number(totalAmountOverride);
+    } else {
+      const [garagePriceTariff] = await db.select().from(tariffsTable).where(eq(tariffsTable.key, "garage_sale_price"));
+      totalAmount = garagePriceTariff ? Number(garagePriceTariff.value) : 5000;
+    }
+  } else {
+    totalAmount = asset.area * Number(pricePerSqm);
+  }
   const creditAmount = Math.max(0, totalAmount - Number(downPayment));
   const months = saleType === "cash" ? 0 : Number(installmentMonths) || 0;
   const monthlyPayment = months > 0 ? creditAmount / months : 0;
