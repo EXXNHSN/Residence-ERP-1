@@ -18,6 +18,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
+function toRoman(n: number): string {
+  const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const syms = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];
+  let result = "";
+  for (let i = 0; i < vals.length; i++) {
+    while (n >= vals[i]) { result += syms[i]; n -= vals[i]; }
+  }
+  return result;
+}
+
 function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -93,8 +103,20 @@ export default function ApartmentsPage() {
 
   const uniqueFloors = useMemo(() => {
     if (!allApartments) return [];
-    return [...new Set(allApartments.map(a => a.floor))].sort((a, b) => a - b);
-  }, [allApartments]);
+    let source = allApartments;
+    if (filterBlock !== "all") {
+      source = allApartments.filter(a => {
+        const block = blocks?.find(b => b.id === a.blockId);
+        return block?.id.toString() === filterBlock;
+      });
+    } else if (filterKvartal !== "all") {
+      source = allApartments.filter(a => {
+        const block = blocks?.find(b => b.id === a.blockId);
+        return block?.quarterId?.toString() === filterKvartal;
+      });
+    }
+    return [...new Set(source.map(a => a.floor))].sort((a, b) => a - b);
+  }, [allApartments, blocks, filterBlock, filterKvartal]);
 
   const uniqueRooms = useMemo(() => {
     if (!allApartments) return [];
@@ -268,7 +290,7 @@ export default function ApartmentsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground font-medium">Kvartal</p>
-              <Select value={filterKvartal} onValueChange={(v) => { setFilterKvartal(v); setFilterBlock("all"); }}>
+              <Select value={filterKvartal} onValueChange={(v) => { setFilterKvartal(v); setFilterBlock("all"); setFilterFloors(new Set()); }}>
                 <SelectTrigger className="h-9 rounded-xl text-sm bg-background">
                   <SelectValue placeholder="Hamısı" />
                 </SelectTrigger>
@@ -283,7 +305,7 @@ export default function ApartmentsPage() {
 
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground font-medium">Blok / Bina</p>
-              <Select value={filterBlock} onValueChange={setFilterBlock}>
+              <Select value={filterBlock} onValueChange={(v) => { setFilterBlock(v); setFilterFloors(new Set()); }}>
                 <SelectTrigger className="h-9 rounded-xl text-sm bg-background">
                   <SelectValue placeholder="Hamısı" />
                 </SelectTrigger>
@@ -335,7 +357,7 @@ export default function ApartmentsPage() {
                 {uniqueFloors.map(f => (
                   <FilterChip
                     key={f}
-                    label={`${f}-ci`}
+                    label={toRoman(f)}
                     active={filterFloors.has(f)}
                     onClick={() => toggleFloor(f)}
                   />
@@ -379,7 +401,7 @@ export default function ApartmentsPage() {
                           <Home className="w-4 h-4 text-primary/70" /> {apt.number}
                         </div>
                       </TableCell>
-                      <TableCell>{apt.floor}-ci mərtəbə</TableCell>
+                      <TableCell className="font-medium tabular-nums">{toRoman(apt.floor)}</TableCell>
                       <TableCell className="font-medium">{apt.rooms} otaq</TableCell>
                       <TableCell className="font-medium">{formatArea(apt.area)}</TableCell>
                       <TableCell><StatusBadge status={apt.status} type="apartment" /></TableCell>
