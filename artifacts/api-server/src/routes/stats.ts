@@ -113,13 +113,19 @@ router.get("/summary", async (_req, res) => {
   // ── Rentals ──
   const allRentals = await db.select().from(rentalsTable);
   const activeRentals = allRentals.filter((r) => r.status === "active").length;
-  
-  // Object rentals (non-garage)
-  const activeObjectRentals = allRentals.filter((r) => r.status === "active" && r.assetType === "object");
+
+  // Build a set of garage asset IDs to correctly classify rentals
+  // (some old rentals may have assetType="object" even though the actual object is a garage)
+  const garageIds = new Set(allObjs.filter((o) => o.type === "garage").map((o) => o.id));
+  const isGarageRental = (r: typeof allRentals[0]) =>
+    r.assetType === "garage" || (r.assetType === "object" && garageIds.has(r.assetId));
+
+  // Object rentals (true non-garage objects only)
+  const activeObjectRentals = allRentals.filter((r) => r.status === "active" && !isGarageRental(r));
   const monthlyObjectRentalIncome = activeObjectRentals.reduce((sum, r) => sum + Number(r.monthlyAmount), 0);
-  
-  // Garage rentals
-  const activeGarageRentals = allRentals.filter((r) => r.status === "active" && r.assetType === "garage");
+
+  // Garage rentals (by actual object type, not stored assetType field)
+  const activeGarageRentals = allRentals.filter((r) => r.status === "active" && isGarageRental(r));
   const monthlyGarageRentalIncome = activeGarageRentals.reduce((sum, r) => sum + Number(r.monthlyAmount), 0);
   
   const monthlyRentalIncome = monthlyObjectRentalIncome + monthlyGarageRentalIncome;
