@@ -30,7 +30,7 @@ const coreNavigation = [
       { name: "Kvartallar", href: "/quarters", icon: MapPin },
       { name: "Binalar", href: "/blocks", icon: Building2 },
       { name: "Mənzillər", href: "/apartments", icon: HomeIcon },
-      { name: "Qeyri Yaşayış / Avto Dayanacaq", href: "/objects", icon: Store },
+      { name: "Qeyri Yaşayış", href: "/objects", icon: Store },
     ]
   },
   { name: "Sakinlər", href: "/customers", icon: Users },
