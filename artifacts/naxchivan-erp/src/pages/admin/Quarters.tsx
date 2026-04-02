@@ -8,7 +8,7 @@ import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   PlusCircle, Trash2, Building2, Home, ChevronDown, ChevronRight,
-  Layers, Plus, GitBranch, ShieldAlert, Eye, EyeOff, RefreshCw, X, Pencil,
+  Layers, Plus, GitBranch, ShieldAlert, Eye, EyeOff, RefreshCw, X, Pencil, Settings2, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ interface Building {
   blockCount: number; apartmentCount: number; blocks: BuildingBlock[];
 }
 
-interface AptConfig { number: string; area: number; rooms: number; }
+interface AptConfig { id?: number; number: string; area: number; rooms: number; }
 
 interface FloorRow {
   floor: number;
@@ -313,6 +313,138 @@ function BlockEditor({
   );
 }
 
+// ─── BlockReconfigureDialog ───────────────────────────────────────────────────
+
+function BlockReconfigureDialog({
+  block, username, open, onClose, onRefresh,
+}: {
+  block: BuildingBlock;
+  username: string;
+  open: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [blockForm, setBlockForm] = useState<BlockForm | null>(null);
+  const [soldNums, setSoldNums] = useState<string[]>([]);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
+
+  useEffect(() => {
+    if (!open) { setAdminPassword(""); setPwError(null); return; }
+    setBlockForm(null);
+    fetch(`${BASE()}/api/apartments?blockId=${block.id}`)
+      .then((r) => r.json())
+      .then((apts: any[]) => {
+        const floorMap: Record<number, AptConfig[]> = {};
+        const sold: string[] = [];
+        for (const apt of apts) {
+          const fl = apt.floor ?? 1;
+          if (!floorMap[fl]) floorMap[fl] = [];
+          floorMap[fl].push({ id: apt.id, number: apt.number, area: Number(apt.area), rooms: apt.rooms });
+          if (apt.status !== "available") sold.push(apt.number);
+        }
+        const floors: FloorRow[] = Object.keys(floorMap)
+          .map(Number).sort((a, b) => a - b)
+          .map((fl) => ({ floor: fl, apartments: floorMap[fl] }));
+        const minFloor = floors.length > 0 ? floors[0].floor : 2;
+        const totalFloors = floors.length > 0 ? floors[floors.length - 1].floor - minFloor + 1 : block.floors;
+        setSoldNums(sold);
+        setBlockForm({ name: block.name, totalFloors, startFloor: minFloor, floors });
+      });
+  }, [open, block.id]);
+
+  async function handleSave() {
+    if (!blockForm) return;
+    if (!adminPassword.trim()) { setPwError("Admin şifrəsi tələb olunur"); return; }
+    setSaving(true);
+    setPwError(null);
+    try {
+      const floorConfig = blockForm.floors.map((f) => ({
+        floor: f.floor,
+        apartments: f.apartments.map((a) => ({ id: a.id, number: a.number, area: a.area, rooms: a.rooms })),
+      }));
+      const res = await fetch(`${BASE()}/api/admin/blocks/${block.id}/reconfigure`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: adminPassword.trim(), floorConfig }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Xəta" }));
+        setPwError(err.error ?? "Xəta baş verdi");
+        return;
+      }
+      const result = await res.json();
+      toast({ title: `${block.name} yeniləndi`, description: `${result.floorCount} mərtəbə · ${result.apartmentCount} mənzil` });
+      onRefresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings2 className="w-5 h-5 text-primary" />
+            {block.name} — Mərtəbə / Mənzil Redaktəsi
+          </DialogTitle>
+        </DialogHeader>
+
+        {!blockForm ? (
+          <div className="py-10 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="space-y-4 mt-1">
+            {soldNums.length > 0 && (
+              <div className="text-xs bg-amber-50 text-amber-700 rounded-xl px-3 py-2 border border-amber-200">
+                Satılmış / qeyd edilmiş mənzillər silinə bilməz: <strong>{soldNums.join(", ")}</strong>
+              </div>
+            )}
+
+            <FloorTable block={blockForm} onChange={setBlockForm} />
+
+            {/* Admin password */}
+            <div className="border-t border-border/40 pt-4 space-y-2">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5" /> Admin şifrəsi ilə təsdiqlə
+              </label>
+              <div className="relative">
+                <Input
+                  type={showPw ? "text" : "password"}
+                  value={adminPassword}
+                  onChange={(e) => { setAdminPassword(e.target.value); setPwError(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                  placeholder="Şifrəni daxil edin"
+                  className="pr-10 rounded-xl h-10"
+                />
+                <button type="button" onClick={() => setShowPw((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={onClose} disabled={saving}>
+                Ləğv et
+              </Button>
+              <Button className="flex-1 rounded-xl" onClick={handleSave} disabled={saving || !adminPassword}>
+                {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saxlanılır...</> : "Yadda Saxla"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── BuildingRow ──────────────────────────────────────────────────────────────
 
 function BuildingRow({ building, isAdmin, username, onRefresh }: {
@@ -330,6 +462,8 @@ function BuildingRow({ building, isAdmin, username, onRefresh }: {
   const [editBlockOpen, setEditBlockOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<BuildingBlock | null>(null);
   const [editBlockName, setEditBlockName] = useState("");
+
+  const [reconfigBlock, setReconfigBlock] = useState<BuildingBlock | null>(null);
 
   async function handleSaveBuilding(adminPassword: string) {
     const res = await fetch(`${BASE()}/api/buildings/${building.id}`, {
@@ -392,11 +526,20 @@ function BuildingRow({ building, isAdmin, username, onRefresh }: {
                 <span className="text-xs text-muted-foreground flex-shrink-0">{bl.floors} mərtəbə</span>
                 <span className="text-xs text-muted-foreground flex-shrink-0 ml-3">{bl.apartmentCount} mənzil</span>
                 {isAdmin && (
-                  <button
-                    onClick={() => { setEditingBlock(bl); setEditBlockName(bl.name); setEditBlockOpen(true); }}
-                    className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors ml-1 flex-shrink-0">
-                    <Pencil className="w-2.5 h-2.5" />
-                  </button>
+                  <div className="flex items-center gap-0.5 ml-1 flex-shrink-0">
+                    <button
+                      onClick={() => { setEditingBlock(bl); setEditBlockName(bl.name); setEditBlockOpen(true); }}
+                      className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Blokun adını dəyiş">
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                    <button
+                      onClick={() => setReconfigBlock(bl)}
+                      className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Mərtəbə/mənzil redaktəsi">
+                      <Settings2 className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -405,7 +548,7 @@ function BuildingRow({ building, isAdmin, username, onRefresh }: {
       </div>
 
       <AdminEditDialog open={editBuildingOpen} onClose={() => setEditBuildingOpen(false)}
-        title="Binannı Redaktə et" onSave={handleSaveBuilding}>
+        title="Binanı Redaktə et" onSave={handleSaveBuilding}>
         <div className="space-y-2">
           <label className="text-sm font-medium">Bina adı</label>
           <Input value={editBuildingName} onChange={(e) => setEditBuildingName(e.target.value)}
@@ -421,6 +564,16 @@ function BuildingRow({ building, isAdmin, username, onRefresh }: {
             className="rounded-xl h-11" placeholder="Blok adı..." />
         </div>
       </AdminEditDialog>
+
+      {reconfigBlock && (
+        <BlockReconfigureDialog
+          block={reconfigBlock}
+          username={username}
+          open={!!reconfigBlock}
+          onClose={() => setReconfigBlock(null)}
+          onRefresh={() => { setReconfigBlock(null); onRefresh(); }}
+        />
+      )}
     </>
   );
 }

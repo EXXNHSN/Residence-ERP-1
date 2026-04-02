@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { quartersTable, buildingsTable, blocksTable, apartmentsTable, tariffsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 
@@ -243,6 +244,78 @@ router.post("/settings", async (req, res) => {
     }
   }
   res.json({ ok: true });
+});
+
+// ─── Block Reconfigure: add/remove/edit floors & apartments ──────────────────
+// PUT /api/admin/blocks/:id/reconfigure
+// Body: { username, password, floorConfig: [{floor, apartments: [{id?, number, area, rooms}]}] }
+router.put("/blocks/:id/reconfigure", async (req, res) => {
+  const { username, password, floorConfig } = req.body as {
+    username: string;
+    password: string;
+    floorConfig: Array<{ floor: number; apartments: Array<{ id?: number; number: string; area: number; rooms: number }> }>;
+  };
+
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const blockId = Number(req.params.id);
+  const [block] = await db.select().from(blocksTable).where(eq(blocksTable.id, blockId)).limit(1);
+  if (!block) return res.status(404).json({ error: "Blok tapılmadı" });
+
+  // Get all existing apartments for this block
+  const existing = await db.select().from(apartmentsTable).where(eq(apartmentsTable.blockId, blockId));
+  const existingIds = new Set(existing.map((a) => a.id));
+
+  // Collect all incoming IDs (existing apartments that should remain)
+  const incomingIds = new Set<number>();
+  for (const floor of floorConfig) {
+    for (const apt of floor.apartments) {
+      if (apt.id) incomingIds.add(apt.id);
+    }
+  }
+
+  // Delete apartments that are no longer in the config (only if available — don't delete sold/reserved)
+  const toDelete = existing.filter(
+    (a) => !incomingIds.has(a.id) && (a.status === "available")
+  );
+  if (toDelete.length > 0) {
+    await db.delete(apartmentsTable).where(
+      inArray(apartmentsTable.id, toDelete.map((a) => a.id))
+    );
+  }
+
+  // Upsert apartments from config
+  for (const floor of floorConfig) {
+    for (const apt of floor.apartments) {
+      if (apt.id && existingIds.has(apt.id)) {
+        // Update existing apartment
+        await db.update(apartmentsTable).set({
+          number: apt.number,
+          area: String(apt.area),
+          rooms: apt.rooms,
+          floor: floor.floor,
+        }).where(eq(apartmentsTable.id, apt.id));
+      } else {
+        // Create new apartment
+        await db.insert(apartmentsTable).values({
+          blockId,
+          number: apt.number || `${floor.floor}xx`,
+          floor: floor.floor,
+          area: String(apt.area),
+          rooms: apt.rooms,
+          status: "available",
+        });
+      }
+    }
+  }
+
+  // Recalculate block's floor count based on highest floor in config
+  const maxFloor = floorConfig.reduce((m, f) => Math.max(m, f.floor), 0);
+  await db.update(blocksTable).set({ floors: maxFloor }).where(eq(blocksTable.id, blockId));
+
+  // Return summary
+  const updatedApts = await db.select().from(apartmentsTable).where(eq(apartmentsTable.blockId, blockId));
+  res.json({ blockId, floorCount: maxFloor, apartmentCount: updatedApts.length });
 });
 
 export default router;
