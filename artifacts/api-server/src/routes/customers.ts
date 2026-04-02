@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable, rentalsTable } from "@workspace/db/schema";
+import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable, rentalsTable, objectPaymentsTable } from "@workspace/db/schema";
 import { eq, or, ilike, inArray } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
@@ -149,8 +149,18 @@ router.delete("/:id", async (req, res) => {
     await db.delete(salesTable).where(inArray(salesTable.id, saleIds));
   }
 
-  // Delete rentals for this customer
-  await db.delete(rentalsTable).where(eq(rentalsTable.customerId, customerId));
+  // Delete rentals for this customer (payments first, then rentals)
+  const customerRentals = await db.select({ id: rentalsTable.id }).from(rentalsTable).where(eq(rentalsTable.customerId, customerId));
+  if (customerRentals.length > 0) {
+    const rentalIds = customerRentals.map(r => r.id);
+    await db.delete(objectPaymentsTable).where(inArray(objectPaymentsTable.rentalId, rentalIds));
+    // Free up rented assets
+    for (const rental of customerRentals) {
+      const [r] = await db.select().from(rentalsTable).where(eq(rentalsTable.id, rental.id)).limit(1);
+      if (r) await db.update(objectsTable).set({ status: "available" }).where(eq(objectsTable.id, r.assetId));
+    }
+    await db.delete(rentalsTable).where(inArray(rentalsTable.id, rentalIds));
+  }
 
   // Delete customer
   await db.delete(customersTable).where(eq(customersTable.id, customerId));
