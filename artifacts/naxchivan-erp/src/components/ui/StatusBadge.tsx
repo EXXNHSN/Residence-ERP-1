@@ -65,7 +65,7 @@ export function StatusBadge({ status, type = 'default' }: { status: string, type
     // defaults for object status etc
     if (status === 'available') { colorClass = "bg-emerald-100 text-emerald-800"; label = "Boş"; }
     if (status === 'sold') { colorClass = "bg-rose-100 text-rose-800"; label = "Satılıb"; }
-    if (status === 'rented') { colorClass = "bg-indigo-100 text-indigo-800"; label = "Kirayədə"; }
+    if (status === 'rented') { colorClass = "bg-indigo-100 text-indigo-800"; label = "İcarədə"; }
     if (status === 'cash') { colorClass = "bg-emerald-100 text-emerald-800"; label = "Nağd"; }
     if (status === 'credit') { colorClass = "bg-blue-100 text-blue-800"; label = "Kredit"; }
   }

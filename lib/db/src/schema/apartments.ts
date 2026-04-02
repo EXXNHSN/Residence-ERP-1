@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { blocksTable } from "./blocks";
@@ -11,6 +11,7 @@ export const apartmentsTable = pgTable("apartments", {
   rooms: integer("rooms").notNull().default(1),
   area: numeric("area", { precision: 10, scale: 2 }).notNull(),
   status: text("status", { enum: ["available", "sold", "reserved"] }).notNull().default("available"),
+  handedOver: boolean("handed_over").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

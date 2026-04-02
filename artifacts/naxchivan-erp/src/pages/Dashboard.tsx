@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useGetDashboardStats, useListSales, useListInstallments } from "@workspace/api-client-react";
+import { useGetDashboardStats } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { 
@@ -13,40 +13,18 @@ import {
   Users,
   Store,
   Zap,
-  CalendarDays,
+  Building2,
+  CheckCircle2,
+  CircleDollarSign,
+  Banknote,
   ArrowRight
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { useMemo } from "react";
-import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
-import { az } from "date-fns/locale";
 import { Link } from "wouter";
 
 export default function Dashboard() {
   const { data: stats, isLoading, isError } = useGetDashboardStats();
-  const { data: allSales } = useListSales();
-  const { data: allInstallments } = useListInstallments();
-
-  const creditSales = useMemo(() => (allSales ?? []).filter((s: any) => s.saleType === "credit"), [allSales]);
-  const totalOutstanding = useMemo(() => creditSales.reduce((sum, s: any) => sum + Number(s.remainingAmount), 0), [creditSales]);
-
-  const nextThreeMonths = useMemo(() => {
-    const now = new Date();
-    return [0, 1, 2].map(offset => {
-      const month = addMonths(now, offset);
-      const from = startOfMonth(month);
-      const to = endOfMonth(month);
-      const inRange = (allInstallments ?? []).filter((inst: any) => {
-        const due = parseISO(inst.dueDate);
-        return isWithinInterval(due, { start: from, end: to }) && (inst.status === "pending" || inst.status === "overdue");
-      });
-      return {
-        label: format(month, "MMM", { locale: az }),
-        amount: inRange.reduce((s: number, i: any) => s + Number(i.amount), 0),
-      };
-    });
-  }, [allInstallments]);
 
   if (isError) {
     return (
@@ -57,37 +35,6 @@ export default function Dashboard() {
       </AppLayout>
     );
   }
-
-  const statCards = [
-    {
-      title: "Ümumi Gəlir",
-      value: stats ? formatCurrency(stats.totalRevenue) : "0",
-      icon: Wallet,
-      color: "text-emerald-600",
-      bg: "bg-emerald-100/50",
-    },
-    {
-      title: "Bu Ayın Gözlənilən Ödənişi",
-      value: stats ? formatCurrency(stats.monthlyPendingAmount) : "0",
-      icon: TrendingUp,
-      color: "text-blue-600",
-      bg: "bg-blue-100/50",
-    },
-    {
-      title: "Aktiv Kirayələr",
-      value: stats?.activeRentals || 0,
-      icon: Key,
-      color: "text-indigo-600",
-      bg: "bg-indigo-100/50",
-    },
-    {
-      title: "Gecikmiş Ödənişlər",
-      value: stats?.overdueInstallments || 0,
-      icon: AlertCircle,
-      color: "text-rose-600",
-      bg: "bg-rose-100/50",
-    },
-  ];
 
   const apartmentData = stats ? [
     { name: "Satılıb", value: stats.soldApartments, color: "#10b981" },
@@ -103,63 +50,157 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-1">Naxçıvan Residence ümumi statistika və hesabatlar.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-32 rounded-2xl" />
-            ))
-          ) : (
-            statCards.map((card, i) => (
-              <Card key={i} className="border-none shadow-lg shadow-black/5 hover:shadow-xl transition-shadow duration-300">
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl ${card.bg} flex items-center justify-center shrink-0`}>
-                    <card.icon className={`w-7 h-7 ${card.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
-                    <h3 className="text-2xl font-bold text-foreground mt-1">{card.value}</h3>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+        {/* ── Satış Gəlir Bölməsi ── */}
+        <div>
+          <h2 className="text-base font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+            <CircleDollarSign className="w-4 h-4" /> Mənzil Satış Gəliri
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)
+            ) : (
+              <>
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-100/60 flex items-center justify-center shrink-0">
+                      <Banknote className="w-7 h-7 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nağd Satış</p>
+                      <h3 className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(stats?.cashSalesRevenue ?? 0)}</h3>
+                      <p className="text-xs text-emerald-600 mt-0.5">{stats?.cashSales ?? 0} satış</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-100/60 flex items-center justify-center shrink-0">
+                      <Wallet className="w-7 h-7 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">İlkin Ödəniş (Kredit)</p>
+                      <h3 className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(stats?.downPaymentRevenue ?? 0)}</h3>
+                      <p className="text-xs text-blue-600 mt-0.5">{stats?.creditSales ?? 0} kredit müştəri</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-violet-100/60 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-7 h-7 text-violet-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Kredit Taksit Gəliri</p>
+                      <h3 className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(stats?.creditInstallmentIncome ?? 0)}</h3>
+                      <p className="text-xs text-violet-600 mt-0.5">Ümumi: {formatCurrency((stats?.cashSalesRevenue ?? 0) + (stats?.downPaymentRevenue ?? 0) + (stats?.creditInstallmentIncome ?? 0))}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
         </div>
 
-        <Card className="border-none shadow-lg shadow-black/5">
-          <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-blue-600" />
-              Kredit Satışlar — Rəhbərlik üçün
-            </CardTitle>
-            <Link href="/sales/credits" className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
-              Ətraflı <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 rounded-2xl p-4 flex flex-col gap-1">
-                <span className="text-xs text-blue-500 font-medium flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Kredit Müştəri</span>
-                <span className="text-2xl font-bold text-blue-700">{creditSales.length}</span>
-              </div>
-              <div className="bg-amber-50 rounded-2xl p-4 flex flex-col gap-1">
-                <span className="text-xs text-amber-500 font-medium flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Ümumi Qalıq Borc</span>
-                <span className="text-xl font-bold text-amber-700">{formatCurrency(totalOutstanding)}</span>
-              </div>
-              {nextThreeMonths.map((m, i) => (
-                <div key={i} className={`${i === 0 ? "bg-emerald-50" : "bg-slate-50"} rounded-2xl p-4 flex flex-col gap-1`}>
-                  <span className={`text-xs font-medium flex items-center gap-1.5 ${i === 0 ? "text-emerald-500" : "text-slate-400"}`}>
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    {i === 0 ? "Bu ay" : i === 1 ? "Növbəti ay" : "2 ay sonra"} ({m.label})
-                  </span>
-                  <span className={`text-xl font-bold ${i === 0 ? "text-emerald-700" : "text-slate-600"}`}>
-                    {formatCurrency(m.amount)}
-                  </span>
+        {/* ── Kredit Aylıq Ödəniş Statistikası ── */}
+        <div>
+          <h2 className="text-base font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" /> Kredit Aylıq Ödəniş Statistikası
+          </h2>
+          <Card className="border-none shadow-lg shadow-black/5">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-amber-50 rounded-2xl p-4">
+                  <p className="text-xs text-amber-500 font-medium flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5" /> Bu Ay Gözlənilən
+                  </p>
+                  <p className="text-2xl font-bold text-amber-700 mt-1">{formatCurrency(stats?.monthlyPendingAmount ?? 0)}</p>
+                  <p className="text-xs text-amber-400 mt-0.5">Ödənilməyən taksitlər</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <div className="bg-emerald-50 rounded-2xl p-4">
+                  <p className="text-xs text-emerald-500 font-medium flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Bu Ay Ödənildi
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-700 mt-1">{formatCurrency(stats?.monthlyInstallmentIncome ?? 0)}</p>
+                  <p className="text-xs text-emerald-400 mt-0.5">Daxil olan gəlir</p>
+                </div>
+                {(stats?.installmentProjections ?? []).slice(0, 2).map((proj: any, i: number) => (
+                  <div key={i} className="bg-slate-50 rounded-2xl p-4">
+                    <p className="text-xs text-slate-500 font-medium">
+                      {i === 0 ? "Növbəti ay" : "2 ay sonra"} — {proj.month}/{proj.year}
+                    </p>
+                    <p className="text-2xl font-bold text-slate-700 mt-1">{formatCurrency(proj.expected)}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Gözlənilən taksit</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <span className="text-rose-600 font-medium">{stats?.overdueInstallments ?? 0}</span>
+                <span className="text-muted-foreground">gecikmiş taksit</span>
+                <span className="mx-2 text-border">·</span>
+                <Link href="/sales/credits" className="text-primary hover:text-primary/80 flex items-center gap-1 transition-colors text-xs">
+                  Kredit hesabatı <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
+        {/* ── İcarə Bölməsi ── */}
+        <div>
+          <h2 className="text-base font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+            <Key className="w-4 h-4" /> İcarə Gəliri
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)
+            ) : (
+              <>
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-100/60 flex items-center justify-center shrink-0">
+                      <CircleDollarSign className="w-7 h-7 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Aylıq İcarə Gəliri</p>
+                      <h3 className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(stats?.monthlyRentalIncome ?? 0)}</h3>
+                      <p className="text-xs text-indigo-600 mt-0.5">{stats?.activeRentals ?? 0} aktiv müqavilə</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-100/60 flex items-center justify-center shrink-0">
+                      <Store className="w-7 h-7 text-rose-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">İcarədə Olan Obyektlər</p>
+                      <h3 className="text-2xl font-bold text-foreground mt-0.5">{stats?.rentedObjects ?? 0}</h3>
+                      <p className="text-xs text-rose-600 mt-0.5">hal-hazırda icarədə</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-teal-100/60 flex items-center justify-center shrink-0">
+                      <Building2 className="w-7 h-7 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Boş Olan Obyektlər</p>
+                      <h3 className="text-2xl font-bold text-foreground mt-0.5">{stats?.availableObjects ?? 0}</h3>
+                      <p className="text-xs text-teal-600 mt-0.5">icarəyə hazır</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Mənzil Statistikası + Ümumi Məlumat ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="col-span-1 lg:col-span-2 border-none shadow-lg shadow-black/5">
             <CardHeader>
@@ -198,38 +239,52 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-primary" />
-                Ümumi Məlumat
+                Ümumi Statistika
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6 mt-2">
+            <CardContent className="space-y-4 mt-2">
               {isLoading ? (
                 <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
                 </div>
               ) : stats && (
                 <>
-                  <div className="flex justify-between items-center pb-4 border-b border-border/50">
-                    <span className="text-muted-foreground flex items-center gap-2">
+                  <div className="flex justify-between items-center pb-3 border-b border-border/50">
+                    <span className="text-muted-foreground flex items-center gap-2 text-sm">
                       <Users className="w-4 h-4" /> Müştərilər
                     </span>
                     <span className="font-bold text-lg">{stats.totalCustomers}</span>
                   </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-border/50">
-                    <span className="text-muted-foreground flex items-center gap-2">
+                  <div className="flex justify-between items-center pb-3 border-b border-border/50">
+                    <span className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <Home className="w-4 h-4" /> Satılmış Mənzil
+                    </span>
+                    <span className="font-bold text-lg text-emerald-600">{stats.soldApartments}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-3 border-b border-border/50">
+                    <span className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="w-4 h-4" /> Tehvil Edilmiş
+                    </span>
+                    <span className="font-bold text-lg text-blue-600">{stats.handedOverApartments}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-3 border-b border-border/50">
+                    <span className="text-muted-foreground flex items-center gap-2 text-sm">
                       <Store className="w-4 h-4" /> Obyekt/Qaraj
                     </span>
                     <span className="font-bold text-lg">{stats.totalObjects + stats.totalGarages}</span>
                   </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-border/50">
-                    <span className="text-muted-foreground flex items-center gap-2">
+                  <div className="flex justify-between items-center pb-3 border-b border-border/50">
+                    <span className="text-muted-foreground flex items-center gap-2 text-sm">
                       <Wifi className="w-4 h-4" /> İnternet Abunə
                     </span>
                     <span className="font-bold text-lg">{stats.activeInternetSubscriptions}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground flex items-center gap-2">
+                    <span className="text-muted-foreground flex items-center gap-2 text-sm">
                       <Zap className="w-4 h-4" /> Gözləyən Kommunal
                     </span>
                     <span className="font-bold text-lg text-amber-600">{stats.pendingCommunalBills}</span>

@@ -22,6 +22,7 @@ async function enrichApartment(apt: typeof apartmentsTable.$inferSelect, blockNa
     rooms: apt.rooms,
     area,
     status: apt.status,
+    handedOver: apt.handedOver,
     pricePerSqm,
     totalPrice: area * pricePerSqm,
   };
@@ -109,6 +110,19 @@ router.put("/:id", async (req, res) => {
     .where(eq(apartmentsTable.id, Number(req.params.id)))
     .returning();
 
+  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  const block = await db.select().from(blocksTable).where(eq(blocksTable.id, updated.blockId)).limit(1);
+  const pricePerSqm = await getApartmentPricePerSqm();
+  res.json(await enrichApartment(updated, block[0]?.name ?? "", pricePerSqm));
+});
+
+router.patch("/:id/handover", async (req, res) => {
+  const { handedOver } = req.body;
+  const [updated] = await db
+    .update(apartmentsTable)
+    .set({ handedOver: Boolean(handedOver) })
+    .where(eq(apartmentsTable.id, Number(req.params.id)))
+    .returning();
   if (!updated) return res.status(404).json({ error: "Tapılmadı" });
   const block = await db.select().from(blocksTable).where(eq(blocksTable.id, updated.blockId)).limit(1);
   const pricePerSqm = await getApartmentPricePerSqm();

@@ -116,19 +116,19 @@ export default function RentalsPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Kirayələr</h1>
-            <p className="text-muted-foreground mt-1">Obyekt və qarajların kirayə müqavilələri</p>
+            <h1 className="text-3xl font-display font-bold text-foreground">İcarələr</h1>
+            <p className="text-muted-foreground mt-1">Obyekt və qarajların icarə müqavilələri</p>
           </div>
 
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-                <Plus className="w-5 h-5 mr-2" /> Yeni Kirayə
+                <Plus className="w-5 h-5 mr-2" /> Yeni İcarə
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-xl font-display">Yeni Kirayə Müqaviləsi</DialogTitle>
+                <DialogTitle className="text-xl font-display">Yeni İcarə Müqaviləsi</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
                 {/* Tenant info */}

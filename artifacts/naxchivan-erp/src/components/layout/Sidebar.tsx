@@ -35,7 +35,7 @@ const coreNavigation = [
   { name: "Müştərilər", href: "/customers", icon: Users },
   { name: "Satışlar", href: "/sales", icon: CreditCard },
   { name: "Ödənişlər", href: "/installments", icon: CalendarDays },
-  { name: "Kirayə", href: "/rentals", icon: Key },
+  { name: "İcarə", href: "/rentals", icon: Key },
   { name: "Kommunal", href: "/communal", icon: Zap },
   { name: "İnternet", href: "/internet", icon: Wifi },
   { name: "Tariflər", href: "/tariffs", icon: Settings },

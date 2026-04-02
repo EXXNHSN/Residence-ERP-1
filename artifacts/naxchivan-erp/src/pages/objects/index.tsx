@@ -90,7 +90,7 @@ export default function ObjectsPage() {
                 <SelectItem value="all">Bütün Statuslar</SelectItem>
                 <SelectItem value={ObjectStatus.available}>Boş</SelectItem>
                 <SelectItem value={ObjectStatus.sold}>Satılıb</SelectItem>
-                <SelectItem value={ObjectStatus.rented}>Kirayədə</SelectItem>
+                <SelectItem value={ObjectStatus.rented}>İcarədə</SelectItem>
               </SelectContent>
             </Select>
 

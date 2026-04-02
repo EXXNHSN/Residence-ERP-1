@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Loader2, Home, Pencil, SlidersHorizontal, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListApartmentsQueryKey } from "@workspace/api-client-react";
@@ -175,6 +176,23 @@ export default function ApartmentsPage() {
     setEditRooms(String(apt.rooms ?? ""));
     setEditArea(String(apt.area ?? ""));
     setEditOpen(true);
+  }
+
+  const [handoverLoading, setHandoverLoading] = useState<Set<number>>(new Set());
+
+  async function toggleHandover(apt: any) {
+    setHandoverLoading(prev => new Set(prev).add(apt.id));
+    try {
+      await fetch(`${BASE()}/api/apartments/${apt.id}/handover`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handedOver: !apt.handedOver }),
+      });
+      queryClient.invalidateQueries({ queryKey: getListApartmentsQueryKey() });
+      toast({ title: apt.handedOver ? "Tehvil statusu ləğv edildi" : `Mənzil #${apt.number} tehvil edildi — kommunal hesab aktiv olacaq` });
+    } finally {
+      setHandoverLoading(prev => { const s = new Set(prev); s.delete(apt.id); return s; });
+    }
   }
 
   async function handleSaveApartment(adminPassword: string) {
@@ -381,19 +399,20 @@ export default function ApartmentsPage() {
                   <TableHead>Otaq</TableHead>
                   <TableHead>Sahə</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-[110px]">Tehvil</TableHead>
                   {isAdmin && <TableHead className="w-[60px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {apartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-12 text-muted-foreground">
                       {hasActiveFilters ? "Seçilmiş filterlərə uyğun mənzil tapılmadı" : "Məlumat tapılmadı"}
                     </TableCell>
                   </TableRow>
                 ) : (
                   apartments.map((apt) => (
-                    <TableRow key={apt.id} className="hover:bg-muted/30 transition-colors">
+                    <TableRow key={apt.id} className={`hover:bg-muted/30 transition-colors ${(apt as any).handedOver ? "bg-blue-50/30" : ""}`}>
                       <TableCell className="font-medium text-muted-foreground">#{apt.id}</TableCell>
                       <TableCell className="font-semibold text-foreground">{apt.blockName}</TableCell>
                       <TableCell>
@@ -405,6 +424,20 @@ export default function ApartmentsPage() {
                       <TableCell className="font-medium">{apt.rooms} otaq</TableCell>
                       <TableCell className="font-medium">{formatArea(apt.area)}</TableCell>
                       <TableCell><StatusBadge status={apt.status} type="apartment" /></TableCell>
+                      <TableCell>
+                        {apt.status === "sold" ? (
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={Boolean((apt as any).handedOver)}
+                              disabled={handoverLoading.has(apt.id)}
+                              onCheckedChange={() => toggleHandover(apt)}
+                              className="data-[state=checked]:bg-blue-500"
+                            />
+                            {handoverLoading.has(apt.id) && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                            {(apt as any).handedOver && <span className="text-xs text-blue-600 font-medium">Edilib</span>}
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground/40">—</span>}
+                      </TableCell>
                       {isAdmin && (
                         <TableCell>
                           <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"

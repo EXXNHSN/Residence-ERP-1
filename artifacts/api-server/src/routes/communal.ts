@@ -89,11 +89,11 @@ router.post("/", async (req, res) => {
 
   const bills: typeof communalBillsTable.$inferInsert[] = [];
 
-  // Get sold apartments
+  // Get handed-over apartments only (tehvil edilmiş)
   const soldApartments = await db
     .select({ apt: apartmentsTable })
     .from(apartmentsTable)
-    .where(eq(apartmentsTable.status, "sold"));
+    .where(and(eq(apartmentsTable.status, "sold"), eq(apartmentsTable.handedOver, true)));
 
   for (const { apt } of soldApartments) {
     // Find owner
