@@ -7,9 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
-import { Loader2, ArrowLeft, Phone, MapPin, Hash, Pencil } from "lucide-react";
+import { Loader2, ArrowLeft, Phone, MapPin, Hash, Pencil, CreditCard, Key } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +19,20 @@ import { getGetCustomerQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function RentalStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    active: { label: "Aktiv", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    ended: { label: "Bitib", className: "bg-slate-100 text-slate-600 border-slate-200" },
+    cancelled: { label: "Ləğv edilib", className: "bg-red-100 text-red-700 border-red-200" },
+  };
+  const s = map[status] ?? { label: status, className: "bg-slate-100 text-slate-600 border-slate-200" };
+  return (
+    <Badge variant="outline" className={`text-xs font-medium px-2 py-0.5 rounded-full border ${s.className}`}>
+      {s.label}
+    </Badge>
+  );
+}
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -73,6 +88,9 @@ export default function CustomerDetailPage() {
     return <AppLayout><div className="text-center text-destructive p-12">Sakin tapılmadı</div></AppLayout>;
   }
 
+  const rentals = (customer as any).rentals ?? [];
+  const sales = customer.sales ?? [];
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -87,6 +105,7 @@ export default function CustomerDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Profile card */}
           <Card className="border-none shadow-lg shadow-black/5 md:col-span-1 h-fit">
             <CardContent className="p-6">
               <div className="flex flex-col items-center text-center border-b border-border/50 pb-6 mb-6 relative">
@@ -125,63 +144,133 @@ export default function CustomerDetailPage() {
                     <p className="font-medium">{customer.address || '-'}</p>
                   </div>
                 </div>
+
+                {/* Summary stats */}
+                <div className="pt-2 border-t border-border/50 grid grid-cols-2 gap-3 mt-2">
+                  <div className="bg-muted/60 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-primary">{sales.length}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Satınalma</p>
+                  </div>
+                  <div className="bg-muted/60 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-600">{rentals.length}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">İcarə</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-lg shadow-black/5 md:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-lg">Satınalma Tarixçəsi</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {customer.sales.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">Bu sakinin satınalması yoxdur.</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tarix</TableHead>
-                      <TableHead>Aktiv</TableHead>
-                      <TableHead>Növ</TableHead>
-                      <TableHead className="text-right">Ümumi</TableHead>
-                      <TableHead className="text-right">Ödənilib</TableHead>
-                      <TableHead className="text-right">Qalıq Borc</TableHead>
-                      <TableHead className="w-[100px]">İrəliləyiş</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {customer.sales.map((sale: any) => (
-                      <TableRow key={sale.id}>
-                        <TableCell className="text-sm">{format(new Date(sale.saleDate), 'dd.MM.yyyy')}</TableCell>
-                        <TableCell className="font-medium">{sale.assetDescription}</TableCell>
-                        <TableCell><StatusBadge status={sale.saleType} /></TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-bold text-emerald-600">{formatCurrency(sale.paidAmount)}</span>
-                          {sale.saleType === 'credit' && sale.downPayment > 0 && (
-                            <div className="text-[11px] text-muted-foreground mt-0.5">
-                              İlkin: {formatCurrency(sale.downPayment)}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={`font-semibold ${sale.remainingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {formatCurrency(sale.remainingAmount)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <span className="text-xs text-muted-foreground">{sale.progressPercent ?? 0}%</span>
-                            <Progress value={sale.progressPercent ?? 0} className="h-1.5 bg-slate-100" />
-                          </div>
-                        </TableCell>
+          {/* Right column */}
+          <div className="md:col-span-2 space-y-6">
+            {/* Sales */}
+            <Card className="border-none shadow-lg shadow-black/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  Satınalma Tarixçəsi
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {sales.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">Bu sakinin satınalması yoxdur.</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tarix</TableHead>
+                        <TableHead>Aktiv</TableHead>
+                        <TableHead>Ödəniş Kodu</TableHead>
+                        <TableHead>Növ</TableHead>
+                        <TableHead className="text-right">Ümumi</TableHead>
+                        <TableHead className="text-right">Ödənilib</TableHead>
+                        <TableHead className="text-right">Borc</TableHead>
+                        <TableHead className="w-[90px]">İrəliləyiş</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {sales.map((sale: any) => (
+                        <TableRow key={sale.id}>
+                          <TableCell className="text-sm">{format(new Date(sale.saleDate), 'dd.MM.yyyy')}</TableCell>
+                          <TableCell className="font-medium">{sale.assetDescription}</TableCell>
+                          <TableCell>
+                            {sale.paymentCode ? (
+                              <div className="flex items-center gap-1.5">
+                                <Key className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="font-mono text-xs tracking-wider text-foreground select-all">
+                                  {sale.paymentCode}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell><StatusBadge status={sale.saleType} /></TableCell>
+                          <TableCell className="text-right font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-bold text-emerald-600">{formatCurrency(sale.paidAmount)}</span>
+                            {sale.saleType === 'credit' && sale.downPayment > 0 && (
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                İlkin: {formatCurrency(sale.downPayment)}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={`font-semibold ${sale.remainingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {formatCurrency(sale.remainingAmount)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <span className="text-xs text-muted-foreground">{sale.progressPercent ?? 0}%</span>
+                              <Progress value={sale.progressPercent ?? 0} className="h-1.5 bg-slate-100" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Rentals */}
+            <Card className="border-none shadow-lg shadow-black/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Key className="w-5 h-5 text-blue-600" />
+                  İcarə Müqavilələri
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {rentals.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">Bu sakinin icarə müqaviləsi yoxdur.</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Aktiv</TableHead>
+                        <TableHead>Başlanğıc</TableHead>
+                        <TableHead>Bitmə</TableHead>
+                        <TableHead className="text-right">Aylıq</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rentals.map((rental: any) => (
+                        <TableRow key={rental.id}>
+                          <TableCell className="font-medium">{rental.assetDescription}</TableCell>
+                          <TableCell className="text-sm">{format(new Date(rental.startDate), 'dd.MM.yyyy')}</TableCell>
+                          <TableCell className="text-sm">{format(new Date(rental.endDate), 'dd.MM.yyyy')}</TableCell>
+                          <TableCell className="text-right font-bold text-blue-700">{formatCurrency(rental.monthlyAmount)}</TableCell>
+                          <TableCell><RentalStatusBadge status={rental.status} /></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 

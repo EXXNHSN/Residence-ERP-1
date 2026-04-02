@@ -11,6 +11,10 @@ async function getApartmentPricePerSqm(): Promise<number> {
   return tariff.length ? Number(tariff[0].value) : 1000;
 }
 
+function generatePaymentCode(): string {
+  return Math.floor(Math.random() * 900000000000 + 100000000000).toString();
+}
+
 async function enrichApartment(apt: typeof apartmentsTable.$inferSelect, blockName: string, pricePerSqm: number) {
   const area = Number(apt.area);
   return {
@@ -23,6 +27,7 @@ async function enrichApartment(apt: typeof apartmentsTable.$inferSelect, blockNa
     area,
     status: apt.status,
     handedOver: apt.handedOver,
+    paymentCode: apt.paymentCode ?? null,
     pricePerSqm,
     totalPrice: area * pricePerSqm,
   };
@@ -50,7 +55,7 @@ router.post("/", async (req, res) => {
   const { blockId, number, floor, rooms, area } = req.body;
   const [apt] = await db
     .insert(apartmentsTable)
-    .values({ blockId, number, floor, rooms: rooms ?? 1, area: String(area) })
+    .values({ blockId, number, floor, rooms: rooms ?? 1, area: String(area), paymentCode: generatePaymentCode() })
     .returning();
   const block = await db.select().from(blocksTable).where(eq(blocksTable.id, blockId)).limit(1);
   const pricePerSqm = await getApartmentPricePerSqm();

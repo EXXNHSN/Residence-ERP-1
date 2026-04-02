@@ -12,6 +12,7 @@ export const apartmentsTable = pgTable("apartments", {
   area: numeric("area", { precision: 10, scale: 2 }).notNull(),
   status: text("status", { enum: ["available", "sold", "reserved"] }).notNull().default("available"),
   handedOver: boolean("handed_over").notNull().default(false),
+  paymentCode: text("payment_code"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

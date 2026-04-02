@@ -51,10 +51,14 @@ interface QuarterInput {
   buildings: BuildingInput[];
 }
 
+function generatePaymentCode(): string {
+  return Math.floor(Math.random() * 900000000000 + 100000000000).toString();
+}
+
 // Generate apartments from floor ranges (legacy)
 function generateFromRanges(blockId: number, floorRanges: FloorRange[]) {
   const apartments: {
-    blockId: number; number: string; floor: number; rooms: number; area: string; status: "available";
+    blockId: number; number: string; floor: number; rooms: number; area: string; status: "available"; paymentCode: string;
   }[] = [];
 
   for (const range of floorRanges) {
@@ -67,6 +71,7 @@ function generateFromRanges(blockId: number, floorRanges: FloorRange[]) {
           rooms: range.rooms,
           area: String(range.area),
           status: "available",
+          paymentCode: generatePaymentCode(),
         });
       }
     }
@@ -77,7 +82,7 @@ function generateFromRanges(blockId: number, floorRanges: FloorRange[]) {
 // Generate apartments from per-floor config (supports both simple and per-apartment modes)
 function generateFromFloorConfig(blockId: number, floorConfig: FloorConfig[]) {
   const apartments: {
-    blockId: number; number: string; floor: number; rooms: number; area: string; status: "available";
+    blockId: number; number: string; floor: number; rooms: number; area: string; status: "available"; paymentCode: string;
   }[] = [];
 
   for (const fc of floorConfig) {
@@ -93,6 +98,7 @@ function generateFromFloorConfig(blockId: number, floorConfig: FloorConfig[]) {
           rooms: apt.rooms,
           area: String(apt.area),
           status: "available",
+          paymentCode: generatePaymentCode(),
         });
       });
     } else if (fc.apartmentsPerFloor && fc.apartmentsPerFloor > 0) {
@@ -105,6 +111,7 @@ function generateFromFloorConfig(blockId: number, floorConfig: FloorConfig[]) {
           rooms: fc.rooms ?? 2,
           area: String(fc.area ?? 80),
           status: "available",
+          paymentCode: generatePaymentCode(),
         });
       }
     }
@@ -304,6 +311,7 @@ router.put("/blocks/:id/reconfigure", async (req, res) => {
           area: String(apt.area),
           rooms: apt.rooms,
           status: "available",
+          paymentCode: generatePaymentCode(),
         });
       }
     }
