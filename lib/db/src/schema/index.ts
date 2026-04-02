@@ -7,6 +7,7 @@ export * from "./customers";
 export * from "./sales";
 export * from "./installments";
 export * from "./rentals";
+export * from "./object_payments";
 export * from "./communal";
 export * from "./internet";
 export * from "./tariffs";

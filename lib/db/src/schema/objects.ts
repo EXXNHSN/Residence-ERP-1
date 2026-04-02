@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -8,6 +8,8 @@ export const objectsTable = pgTable("objects_garages", {
   area: numeric("area", { precision: 10, scale: 2 }).notNull(),
   type: text("type", { enum: ["object", "garage"] }).notNull(),
   status: text("status", { enum: ["available", "sold", "rented"] }).notNull().default("available"),
+  blockId: integer("block_id"),
+  activityType: text("activity_type"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

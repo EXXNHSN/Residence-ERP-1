@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, Search, Phone, Pencil } from "lucide-react";
+import { Plus, Loader2, Search, Phone, Pencil, Trash2, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListCustomersQueryKey } from "@workspace/api-client-react";
 import { useForm } from "react-hook-form";
@@ -24,6 +24,9 @@ export default function CustomersPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -65,6 +68,25 @@ export default function CustomersPage() {
     setEditFin(cust.fin ?? "");
     setEditAddress(cust.address ?? "");
     setEditOpen(true);
+  }
+
+  function openDelete(cust: any) {
+    setDeletingCustomer(cust);
+    setDeleteOpen(true);
+  }
+
+  async function handleDeleteCustomer(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/customers/${deletingCustomer.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user?.username, password: adminPassword }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Xəta baş verdi");
+    }
+    toast({ title: `${deletingCustomer.firstName} ${deletingCustomer.lastName} silindi` });
+    queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
   }
 
   async function handleSaveCustomer(adminPassword: string) {
@@ -197,10 +219,16 @@ export default function CustomersPage() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {isAdmin && (
-                            <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                              onClick={() => openEdit(cust)}>
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
+                            <>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={() => openEdit(cust)}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => openDelete(cust)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </>
                           )}
                           <Link href={`/customers/${cust.id}`} className="text-primary hover:underline text-sm font-medium">
                             Ətraflı
@@ -215,6 +243,23 @@ export default function CustomersPage() {
           )}
         </div>
       </div>
+
+      {/* Delete dialog */}
+      <AdminEditDialog open={deleteOpen} onClose={() => setDeleteOpen(false)}
+        title="Müştərini Sil" onSave={handleDeleteCustomer} saveLabel="Sil" saveVariant="destructive">
+        {deletingCustomer && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Aşağıdakı müştərini silmək istədiyinizə əminsiniz?</p>
+            <div className="flex items-center gap-3 bg-destructive/10 text-destructive rounded-xl px-4 py-3 font-semibold">
+              <User className="w-4 h-4 shrink-0" />
+              {deletingCustomer.firstName} {deletingCustomer.lastName}
+            </div>
+            <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
+              Müştəri silinəndə ona aid bütün satışlar da silinir və satılmış mənzillər yenidən boş olaraq göstərilir.
+            </p>
+          </div>
+        )}
+      </AdminEditDialog>
 
       <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
         title="Müştərini Redaktə et" onSave={handleSaveCustomer}>

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { objectsTable, tariffsTable } from "@workspace/db/schema";
+import { objectsTable, tariffsTable, blocksTable, quartersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 
@@ -11,9 +12,25 @@ async function getPricePerSqm(type: string): Promise<number> {
   return tariff.length ? Number(tariff[0].value) : 800;
 }
 
-function enrichObject(obj: typeof objectsTable.$inferSelect, pricePerSqm: number) {
+async function enrichObject(obj: typeof objectsTable.$inferSelect, pricePerSqm: number) {
   const area = Number(obj.area);
-  return { ...obj, area, pricePerSqm, totalPrice: area * pricePerSqm };
+  let blockName: string | null = null;
+  let quarterName: string | null = null;
+
+  if (obj.blockId) {
+    const rows = await db
+      .select({ blockName: blocksTable.name, quarterName: quartersTable.name })
+      .from(blocksTable)
+      .leftJoin(quartersTable, eq(blocksTable.quarterId, quartersTable.id))
+      .where(eq(blocksTable.id, obj.blockId))
+      .limit(1);
+    if (rows[0]) {
+      blockName = rows[0].blockName ?? null;
+      quarterName = rows[0].quarterName ?? null;
+    }
+  }
+
+  return { ...obj, area, pricePerSqm, monthlyRent: area * pricePerSqm, blockName, quarterName };
 }
 
 router.get("/", async (req, res) => {
@@ -35,13 +52,47 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { number, area, type } = req.body;
+  const { number, area, type, blockId, activityType } = req.body;
   const [obj] = await db
     .insert(objectsTable)
-    .values({ number, area: String(area), type })
+    .values({
+      number,
+      area: String(area),
+      type,
+      blockId: blockId ? Number(blockId) : null,
+      activityType: activityType || null,
+    })
     .returning();
   const pricePerSqm = await getPricePerSqm(type);
-  res.status(201).json(enrichObject(obj, pricePerSqm));
+  res.status(201).json(await enrichObject(obj, pricePerSqm));
+});
+
+router.put("/:id", async (req, res) => {
+  const { username, password, number, area, blockId, activityType } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const updates: any = {};
+  if (number !== undefined) updates.number = String(number);
+  if (area !== undefined && !isNaN(Number(area))) updates.area = String(Number(area));
+  if ("blockId" in req.body) updates.blockId = blockId ? Number(blockId) : null;
+  if ("activityType" in req.body) updates.activityType = activityType || null;
+
+  const [updated] = await db
+    .update(objectsTable)
+    .set(updates)
+    .where(eq(objectsTable.id, Number(req.params.id)))
+    .returning();
+
+  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  const pricePerSqm = await getPricePerSqm(updated.type);
+  res.json(await enrichObject(updated, pricePerSqm));
+});
+
+router.delete("/:id", async (req, res) => {
+  const { username, password } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+  await db.delete(objectsTable).where(eq(objectsTable.id, Number(req.params.id)));
+  res.status(204).send();
 });
 
 export default router;

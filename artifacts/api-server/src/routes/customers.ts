@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable } from "@workspace/db/schema";
-import { eq, or, ilike } from "drizzle-orm";
+import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable, rentalsTable } from "@workspace/db/schema";
+import { eq, or, ilike, inArray } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
@@ -47,7 +47,6 @@ router.get("/:id", async (req, res) => {
 
   const enrichedSales = await Promise.all(
     sales.map(async (sale) => {
-      // Asset description
       let assetDescription = `#${sale.assetId}`;
       if (sale.assetType === "apartment") {
         const [apt] = await db
@@ -61,7 +60,6 @@ router.get("/:id", async (req, res) => {
         if (obj) assetDescription = `${obj.type === "garage" ? "Qaraj" : "Obyekt"} ${obj.number}`;
       }
 
-      // Calculate paid amount from installments
       const installments = await db
         .select()
         .from(installmentsTable)
@@ -118,6 +116,46 @@ router.put("/:id", async (req, res) => {
     .returning();
   if (!updated) return res.status(404).json({ error: "Tapılmadı" });
   res.json(updated);
+});
+
+router.delete("/:id", async (req, res) => {
+  const { username, password } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const customerId = Number(req.params.id);
+  const [customer] = await db.select().from(customersTable).where(eq(customersTable.id, customerId)).limit(1);
+  if (!customer) return res.status(404).json({ error: "Tapılmadı" });
+
+  // Find all sales for this customer
+  const sales = await db.select().from(salesTable).where(eq(salesTable.customerId, customerId));
+
+  // For each sale: reset asset status to available
+  for (const sale of sales) {
+    if (sale.assetType === "apartment") {
+      await db.update(apartmentsTable)
+        .set({ status: "available" })
+        .where(eq(apartmentsTable.id, sale.assetId));
+    } else {
+      await db.update(objectsTable)
+        .set({ status: "available" })
+        .where(eq(objectsTable.id, sale.assetId));
+    }
+  }
+
+  // Delete installments for those sales
+  if (sales.length > 0) {
+    const saleIds = sales.map(s => s.id);
+    await db.delete(installmentsTable).where(inArray(installmentsTable.saleId, saleIds));
+    await db.delete(salesTable).where(inArray(salesTable.id, saleIds));
+  }
+
+  // Delete rentals for this customer
+  await db.delete(rentalsTable).where(eq(rentalsTable.customerId, customerId));
+
+  // Delete customer
+  await db.delete(customersTable).where(eq(customersTable.id, customerId));
+
+  res.status(204).send();
 });
 
 export default router;
