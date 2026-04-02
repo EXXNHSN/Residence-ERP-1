@@ -17,6 +17,7 @@ import {
   MapPin,
   Wand2,
   SlidersHorizontal,
+  Car,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +36,7 @@ const coreNavigation = [
   { name: "Müştərilər", href: "/customers", icon: Users },
   { name: "Satışlar", href: "/sales", icon: CreditCard },
   { name: "Ödənişlər", href: "/installments", icon: CalendarDays },
+  { name: "Qarajlar", href: "/garages", icon: Car },
   { name: "İcarə", href: "/rentals", icon: Key },
   { name: "Kommunal", href: "/communal", icon: Zap },
   { name: "İnternet", href: "/internet", icon: Wifi },
