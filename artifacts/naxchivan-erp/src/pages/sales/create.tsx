@@ -18,9 +18,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
 import { useLocation } from "wouter";
-import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, Layers, SquareStack, X, SlidersHorizontal } from "lucide-react";
+import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, Layers, SquareStack, X, SlidersHorizontal, Zap } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
+
+function toRoman(num: number): string {
+  const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const syms = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];
+  let result = "";
+  for (let i = 0; i < vals.length; i++) {
+    while (num >= vals[i]) { result += syms[i]; num -= vals[i]; }
+  }
+  return result;
+}
 
 function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -81,6 +91,16 @@ export default function CreateSalePage() {
   const [filterBlock, setFilterBlock] = useState("all");
   const [filterFloors, setFilterFloors] = useState<Set<number>>(new Set());
   const [filterRooms, setFilterRooms] = useState("all");
+  const [floorPriceTiers, setFloorPriceTiers] = useState<{ id: number; floorFrom: number; floorTo: number; pricePerSqm: number }[]>([]);
+
+  const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  useEffect(() => {
+    fetch(`${BASE()}/api/floor-price-tiers`)
+      .then(r => r.json())
+      .then(data => Array.isArray(data) && setFloorPriceTiers(data))
+      .catch(() => {});
+  }, []);
 
   const uniqueKvartals = useMemo(() => {
     if (!blocks) return [];
@@ -100,9 +120,15 @@ export default function CreateSalePage() {
   }, [blocks, filterKvartal]);
 
   const uniqueFloors = useMemo(() => {
+    if (filterBlock !== "all" && blocks) {
+      const blk = blocks.find(b => b.id.toString() === filterBlock);
+      if (blk && blk.floors) {
+        return Array.from({ length: blk.floors }, (_, i) => i + 1);
+      }
+    }
     if (!apartments) return [];
-    return [...new Set(apartments.map((a: any) => a.floor))].sort((a, b) => a - b);
-  }, [apartments]);
+    return [...new Set(apartments.map((a: any) => a.floor))].sort((a: number, b: number) => a - b);
+  }, [apartments, filterBlock, blocks]);
 
   const uniqueRooms = useMemo(() => {
     if (!apartments) return [];
@@ -128,12 +154,22 @@ export default function CreateSalePage() {
   };
 
   useEffect(() => {
-    if (tariffs && watchAssetType && !watchPrice) {
-      if (watchAssetType === 'apartment') setValue('pricePerSqm', tariffs.apartmentPricePerSqm.toString());
+    if (!tariffs || !watchAssetType) return;
+    if (watchAssetType !== 'apartment') {
       if (watchAssetType === 'object') setValue('pricePerSqm', tariffs.objectPricePerSqm.toString());
       if (watchAssetType === 'garage') setValue('pricePerSqm', tariffs.garagePricePerSqm.toString());
+      return;
     }
-  }, [tariffs, watchAssetType, watchPrice, setValue]);
+    if (!watchAssetId) {
+      setValue('pricePerSqm', tariffs.apartmentPricePerSqm.toString());
+      return;
+    }
+    const apt = apartments?.find((a: any) => a.id.toString() === watchAssetId);
+    if (!apt) return;
+    const floor = (apt as any).floor as number;
+    const tier = floorPriceTiers.find(t => floor >= t.floorFrom && floor <= t.floorTo);
+    setValue('pricePerSqm', tier ? tier.pricePerSqm.toString() : tariffs.apartmentPricePerSqm.toString());
+  }, [tariffs, watchAssetType, watchAssetId, apartments, floorPriceTiers]);
 
   const [calcResult, setCalcResult] = useState({ total: 0, monthly: 0 });
 
@@ -327,7 +363,7 @@ export default function CreateSalePage() {
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground">Kvartal</p>
-                              <Select value={filterKvartal} onValueChange={(v) => { setFilterKvartal(v); setFilterBlock("all"); setValue('assetId', ''); }}>
+                              <Select value={filterKvartal} onValueChange={(v) => { setFilterKvartal(v); setFilterBlock("all"); setFilterFloors(new Set()); setValue('assetId', ''); }}>
                                 <SelectTrigger className="h-8 rounded-lg text-xs bg-white border-border/60">
                                   <SelectValue placeholder="Hamısı" />
                                 </SelectTrigger>
@@ -342,7 +378,7 @@ export default function CreateSalePage() {
 
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground">Blok / Bina</p>
-                              <Select value={filterBlock} onValueChange={(v) => { setFilterBlock(v); setValue('assetId', ''); }}>
+                              <Select value={filterBlock} onValueChange={(v) => { setFilterBlock(v); setFilterFloors(new Set()); setValue('assetId', ''); }}>
                                 <SelectTrigger className="h-8 rounded-lg text-xs bg-white border-border/60">
                                   <SelectValue placeholder="Hamısı" />
                                 </SelectTrigger>
@@ -379,9 +415,9 @@ export default function CreateSalePage() {
                                 )}
                                 <span className="ml-1.5 text-muted-foreground/50 font-normal text-[10px]">çox seçim mümkündür</span>
                               </p>
-                              <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                              <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
                                 {uniqueFloors.map((f: any) => (
-                                  <FilterChip key={f} label={`${f}-ci`}
+                                  <FilterChip key={f} label={toRoman(f)}
                                     active={filterFloors.has(f)}
                                     onClick={() => toggleFloor(f)} />
                                 ))}
@@ -436,7 +472,7 @@ export default function CreateSalePage() {
                                       </div>
                                       <p className="font-bold text-sm text-foreground">№ {a.number}</p>
                                       <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-0.5"><Layers className="w-3 h-3" />{a.floor}-ci mərtəbə</span>
+                                        <span className="flex items-center gap-0.5"><Layers className="w-3 h-3" />{toRoman(a.floor)} mərtəbə</span>
                                         <span className="flex items-center gap-0.5"><SquareStack className="w-3 h-3" />{a.area} m²</span>
                                       </div>
                                       <p className="text-xs text-muted-foreground mt-0.5">{a.rooms} otaq</p>
@@ -488,8 +524,17 @@ export default function CreateSalePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">1 m² Qiyməti (AZN)</label>
-                    <Input type="number" step="0.01" {...register("pricePerSqm", { required: true })} className="rounded-xl h-12 bg-slate-50" />
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      1 m² Qiyməti (AZN)
+                      {watchAssetId && watchAssetType === 'apartment' && (
+                        <span className="text-[10px] font-normal text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                          <Zap className="w-2.5 h-2.5" /> avtomatik
+                        </span>
+                      )}
+                    </label>
+                    <Input type="number" step="0.01" {...register("pricePerSqm", { required: true })}
+                      className="rounded-xl h-12 bg-slate-50"
+                      placeholder="El ilə daxil edə bilərsiniz" />
                   </div>
                 </div>
 

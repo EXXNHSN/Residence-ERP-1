@@ -12,3 +12,4 @@ export * from "./communal";
 export * from "./internet";
 export * from "./tariffs";
 export * from "./users";
+export * from "./floor_price_tiers";

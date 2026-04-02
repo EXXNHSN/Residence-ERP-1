@@ -4,7 +4,7 @@ import { useListSales } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, Pencil } from "lucide-react";
+import { Plus, Loader2, Pencil, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
@@ -73,9 +73,14 @@ export default function SalesPage() {
             <p className="text-muted-foreground mt-1">Mənzil, obyekt və qaraj satışları</p>
           </div>
           
-          <Link href="/sales/create" className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 rounded-xl px-6 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25">
-            <Plus className="w-5 h-5 mr-2" /> Yeni Satış
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/sales/credits" className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium h-10 rounded-xl px-4 border border-border/60 bg-white hover:bg-muted transition-colors text-foreground shadow-sm">
+              <CreditCard className="w-4 h-4 mr-2 text-blue-600" /> Kredit Hesabat
+            </Link>
+            <Link href="/sales/create" className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium h-10 rounded-xl px-6 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25">
+              <Plus className="w-5 h-5 mr-2" /> Yeni Satış
+            </Link>
+          </div>
         </div>
 
         <div className="bg-card rounded-2xl border border-border/50 shadow-lg shadow-black/5 overflow-hidden">

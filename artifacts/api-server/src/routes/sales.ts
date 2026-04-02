@@ -60,6 +60,7 @@ async function enrichSale(sale: typeof salesTable.$inferSelect) {
     id: sale.id,
     customerId: sale.customerId,
     customerName: customer[0] ? `${customer[0].firstName} ${customer[0].lastName}` : "",
+    customerPhone: customer[0]?.phone ?? "",
     assetType: sale.assetType,
     assetId: sale.assetId,
     assetDescription: asset.description,

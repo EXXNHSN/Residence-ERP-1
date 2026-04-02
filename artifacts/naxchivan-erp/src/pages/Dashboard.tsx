@@ -1,9 +1,8 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useGetDashboardStats } from "@workspace/api-client-react";
+import { useGetDashboardStats, useListSales, useListInstallments } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { 
-  Building2, 
   Wallet, 
   AlertCircle, 
   TrendingUp, 
@@ -13,13 +12,41 @@ import {
   CreditCard,
   Users,
   Store,
-  Zap
+  Zap,
+  CalendarDays,
+  ArrowRight
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useMemo } from "react";
+import { format, addMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
+import { az } from "date-fns/locale";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const { data: stats, isLoading, isError } = useGetDashboardStats();
+  const { data: allSales } = useListSales();
+  const { data: allInstallments } = useListInstallments();
+
+  const creditSales = useMemo(() => (allSales ?? []).filter((s: any) => s.saleType === "credit"), [allSales]);
+  const totalOutstanding = useMemo(() => creditSales.reduce((sum, s: any) => sum + Number(s.remainingAmount), 0), [creditSales]);
+
+  const nextThreeMonths = useMemo(() => {
+    const now = new Date();
+    return [0, 1, 2].map(offset => {
+      const month = addMonths(now, offset);
+      const from = startOfMonth(month);
+      const to = endOfMonth(month);
+      const inRange = (allInstallments ?? []).filter((inst: any) => {
+        const due = parseISO(inst.dueDate);
+        return isWithinInterval(due, { start: from, end: to }) && (inst.status === "pending" || inst.status === "overdue");
+      });
+      return {
+        label: format(month, "MMM", { locale: az }),
+        amount: inRange.reduce((s: number, i: any) => s + Number(i.amount), 0),
+      };
+    });
+  }, [allInstallments]);
 
   if (isError) {
     return (
@@ -97,6 +124,41 @@ export default function Dashboard() {
             ))
           )}
         </div>
+
+        <Card className="border-none shadow-lg shadow-black/5">
+          <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              Kredit Satışlar — Rəhbərlik üçün
+            </CardTitle>
+            <Link href="/sales/credits" className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
+              Ətraflı <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-2xl p-4 flex flex-col gap-1">
+                <span className="text-xs text-blue-500 font-medium flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Kredit Müştəri</span>
+                <span className="text-2xl font-bold text-blue-700">{creditSales.length}</span>
+              </div>
+              <div className="bg-amber-50 rounded-2xl p-4 flex flex-col gap-1">
+                <span className="text-xs text-amber-500 font-medium flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Ümumi Qalıq Borc</span>
+                <span className="text-xl font-bold text-amber-700">{formatCurrency(totalOutstanding)}</span>
+              </div>
+              {nextThreeMonths.map((m, i) => (
+                <div key={i} className={`${i === 0 ? "bg-emerald-50" : "bg-slate-50"} rounded-2xl p-4 flex flex-col gap-1`}>
+                  <span className={`text-xs font-medium flex items-center gap-1.5 ${i === 0 ? "text-emerald-500" : "text-slate-400"}`}>
+                    <CalendarDays className="w-3.5 h-3.5" />
+                    {i === 0 ? "Bu ay" : i === 1 ? "Növbəti ay" : "2 ay sonra"} ({m.label})
+                  </span>
+                  <span className={`text-xl font-bold ${i === 0 ? "text-emerald-700" : "text-slate-600"}`}>
+                    {formatCurrency(m.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="col-span-1 lg:col-span-2 border-none shadow-lg shadow-black/5">

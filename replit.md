@@ -123,7 +123,7 @@ Full-stack property management system for a residential complex.
 - `blocks` — blocks (Blok), FK to `buildings` (+ nullable `quarterId` for legacy)
 - `apartments` — units with `rooms`, `area`, `status`, FK to `blocks`
 - `users` — role: admin | sales
-- `customers`, `sales`, `installments`, `rentals`, `communal_bills`, `internet_subscriptions`, `tariffs`
+- `customers`, `sales`, `installments`, `rentals`, `communal_bills`, `internet_subscriptions`, `tariffs`, `floor_price_tiers`
 
 ### Admin-only actions
 - Add/delete kvartals, buildings, blocks
@@ -133,7 +133,7 @@ Full-stack property management system for a residential complex.
 - User management
 
 ### Routes registered in api-server
-`/quarters`, `/buildings`, `/blocks`, `/apartments`, `/objects`, `/customers`, `/sales`, `/installments`, `/rentals`, `/communal`, `/internet`, `/tariffs`, `/stats`, `/auth`, `/admin`
+`/quarters`, `/buildings`, `/blocks`, `/apartments`, `/objects`, `/customers`, `/sales`, `/installments`, `/rentals`, `/communal`, `/internet`, `/tariffs`, `/stats`, `/auth`, `/admin`, `/floor-price-tiers`
 
 ### Key API endpoints
 - `POST /api/admin/setup` — bulk create: quarters→buildings→blocks→apartments (supports floorRanges)
