@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { 
   useListApartments, 
-  useListObjects, 
+  useListObjects,
+  useListBlocks,
   useCreateSale,
   useCreateCustomer,
   useListTariffs,
@@ -21,11 +22,28 @@ import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, 
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
 
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
+        active
+          ? "bg-primary text-white border-primary shadow-sm"
+          : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function CreateSalePage() {
   const [, setLocation] = useLocation();
   const { data: apartments } = useListApartments({ status: ApartmentStatus.available });
   const { data: objects } = useListObjects({ status: ObjectStatus.available });
   const { data: tariffs } = useListTariffs();
+  const { data: blocks } = useListBlocks();
 
   const { mutateAsync: createCustomer } = useCreateCustomer();
   const { mutate: createSale, isPending } = useCreateSale({
@@ -59,14 +77,27 @@ export default function CreateSalePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [assetSearch, setAssetSearch] = useState("");
+  const [filterKvartal, setFilterKvartal] = useState("all");
   const [filterBlock, setFilterBlock] = useState("all");
-  const [filterFloor, setFilterFloor] = useState("all");
+  const [filterFloors, setFilterFloors] = useState<Set<number>>(new Set());
   const [filterRooms, setFilterRooms] = useState("all");
 
-  const uniqueBlocks = useMemo(() => {
-    if (!apartments) return [];
-    return [...new Set(apartments.map((a: any) => a.blockName))].sort();
-  }, [apartments]);
+  const uniqueKvartals = useMemo(() => {
+    if (!blocks) return [];
+    const seen = new Map<string, { id: number; name: string }>();
+    blocks.forEach(b => {
+      if (b.quarterId && b.quarterName && !seen.has(b.quarterName)) {
+        seen.set(b.quarterName, { id: b.quarterId, name: b.quarterName });
+      }
+    });
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [blocks]);
+
+  const filteredBlockOptions = useMemo(() => {
+    if (!blocks) return [];
+    if (filterKvartal === "all") return blocks;
+    return blocks.filter(b => b.quarterId?.toString() === filterKvartal);
+  }, [blocks, filterKvartal]);
 
   const uniqueFloors = useMemo(() => {
     if (!apartments) return [];
@@ -78,11 +109,20 @@ export default function CreateSalePage() {
     return [...new Set(apartments.map((a: any) => a.rooms))].sort((a, b) => a - b);
   }, [apartments]);
 
-  const hasActiveFilters = filterBlock !== "all" || filterFloor !== "all" || filterRooms !== "all" || assetSearch.trim() !== "";
+  const toggleFloor = (floor: number) => {
+    setFilterFloors(prev => {
+      const next = new Set(prev);
+      if (next.has(floor)) next.delete(floor); else next.add(floor);
+      return next;
+    });
+  };
+
+  const hasActiveFilters = filterKvartal !== "all" || filterBlock !== "all" || filterFloors.size > 0 || filterRooms !== "all" || assetSearch.trim() !== "";
 
   const clearAllFilters = () => {
+    setFilterKvartal("all");
     setFilterBlock("all");
-    setFilterFloor("all");
+    setFilterFloors(new Set());
     setFilterRooms("all");
     setAssetSearch("");
   };
@@ -101,28 +141,21 @@ export default function CreateSalePage() {
     let area = 0;
     if (watchAssetId) {
       if (watchAssetType === 'apartment') {
-        area = apartments?.find(a => a.id.toString() === watchAssetId)?.area || 0;
+        area = apartments?.find((a: any) => a.id.toString() === watchAssetId)?.area || 0;
       } else {
-        area = objects?.find(o => o.id.toString() === watchAssetId)?.area || 0;
+        area = objects?.find((o: any) => o.id.toString() === watchAssetId)?.area || 0;
       }
     }
-
     const price = Number(watchPrice) || 0;
     const totalAmount = area * price;
     let monthly = 0;
-
     if (watchSaleType === 'credit') {
       const dp = Number(watchDownPayment) || 0;
       const months = Number(watchMonths) || 1;
       monthly = (totalAmount - dp) / months;
     }
-
-    setCalcResult({
-      total: totalAmount,
-      monthly: monthly > 0 ? monthly : 0
-    });
+    setCalcResult({ total: totalAmount, monthly: monthly > 0 ? monthly : 0 });
   }, [watchAssetType, watchAssetId, watchPrice, watchSaleType, watchDownPayment, watchMonths, apartments, objects]);
-
 
   const onSubmit = async (data: any) => {
     setIsSubmitting(true);
@@ -136,7 +169,6 @@ export default function CreateSalePage() {
           address: data.address || undefined,
         }
       });
-
       createSale({
         data: {
           customerId: customer.id,
@@ -153,23 +185,22 @@ export default function CreateSalePage() {
     }
   };
 
-  const getAvailableAssets = () => {
-    if (watchAssetType === 'apartment') return apartments || [];
-    if (watchAssetType === 'object') return objects?.filter(o => o.type === 'object') || [];
-    if (watchAssetType === 'garage') return objects?.filter(o => o.type === 'garage') || [];
-    return [];
-  };
-
   const filteredAssets = useMemo(() => {
     let all: any[] = [];
     if (watchAssetType === 'apartment') all = apartments || [];
-    else if (watchAssetType === 'object') all = objects?.filter(o => o.type === 'object') || [];
-    else if (watchAssetType === 'garage') all = objects?.filter(o => o.type === 'garage') || [];
+    else if (watchAssetType === 'object') all = objects?.filter((o: any) => o.type === 'object') || [];
+    else if (watchAssetType === 'garage') all = objects?.filter((o: any) => o.type === 'garage') || [];
 
     return all.filter((a: any) => {
       if (watchAssetType === 'apartment') {
-        if (filterBlock !== 'all' && a.blockName !== filterBlock) return false;
-        if (filterFloor !== 'all' && a.floor !== Number(filterFloor)) return false;
+        if (filterBlock !== 'all') {
+          const block = blocks?.find(b => b.id.toString() === filterBlock);
+          if (!block || a.blockName !== block.name) return false;
+        } else if (filterKvartal !== 'all') {
+          const block = blocks?.find(b => b.name === a.blockName);
+          if (!block || block.quarterId?.toString() !== filterKvartal) return false;
+        }
+        if (filterFloors.size > 0 && !filterFloors.has(a.floor)) return false;
         if (filterRooms !== 'all' && a.rooms !== Number(filterRooms)) return false;
       }
       if (assetSearch.trim()) {
@@ -181,7 +212,7 @@ export default function CreateSalePage() {
       }
       return true;
     });
-  }, [watchAssetType, apartments, objects, assetSearch, filterBlock, filterFloor, filterRooms]);
+  }, [watchAssetType, apartments, objects, blocks, assetSearch, filterKvartal, filterBlock, filterFloors, filterRooms]);
 
   const loading = isPending || isSubmitting;
 
@@ -212,48 +243,29 @@ export default function CreateSalePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Ad <span className="text-destructive">*</span></label>
-                    <Input
-                      {...register("firstName", { required: true })}
-                      placeholder="Əli"
-                      className={`rounded-xl h-12 bg-slate-50 ${errors.firstName ? "border-destructive" : ""}`}
-                    />
+                    <Input {...register("firstName", { required: true })} placeholder="Əli"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.firstName ? "border-destructive" : ""}`} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Soyad <span className="text-destructive">*</span></label>
-                    <Input
-                      {...register("lastName", { required: true })}
-                      placeholder="Əliyev"
-                      className={`rounded-xl h-12 bg-slate-50 ${errors.lastName ? "border-destructive" : ""}`}
-                    />
+                    <Input {...register("lastName", { required: true })} placeholder="Əliyev"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.lastName ? "border-destructive" : ""}`} />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Telefon <span className="text-destructive">*</span></label>
-                    <Input
-                      {...register("phone", { required: true })}
-                      placeholder="+994 50 000 00 00"
-                      className={`rounded-xl h-12 bg-slate-50 ${errors.phone ? "border-destructive" : ""}`}
-                    />
+                    <Input {...register("phone", { required: true })} placeholder="+994 50 000 00 00"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.phone ? "border-destructive" : ""}`} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">FİN Kod</label>
-                    <Input
-                      {...register("fin")}
-                      placeholder="1234ABC"
-                      className="rounded-xl h-12 bg-slate-50"
-                    />
+                    <Input {...register("fin")} placeholder="1234ABC" className="rounded-xl h-12 bg-slate-50" />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Ünvan</label>
-                  <Input
-                    {...register("address")}
-                    placeholder="Naxçıvan, ..."
-                    className="rounded-xl h-12 bg-slate-50"
-                  />
+                  <Input {...register("address")} placeholder="Naxçıvan, ..." className="rounded-xl h-12 bg-slate-50" />
                 </div>
               </CardContent>
             </Card>
@@ -298,72 +310,80 @@ export default function CreateSalePage() {
                           </span>
                         </label>
                         {hasActiveFilters && (
-                          <button
-                            type="button"
-                            onClick={clearAllFilters}
-                            className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
-                          >
-                            <X className="w-3 h-3" /> Filterləri sıfırla
+                          <button type="button" onClick={clearAllFilters}
+                            className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
+                            <X className="w-3 h-3" /> Sıfırla
                           </button>
                         )}
                       </div>
 
                       {watchAssetType === 'apartment' && (
-                        <div className="space-y-2 rounded-xl border border-border/60 bg-slate-50/50 p-3">
-                          <div className="flex items-center gap-1.5 mb-1">
+                        <div className="space-y-3 rounded-xl border border-border/60 bg-slate-50/50 p-3">
+                          <div className="flex items-center gap-1.5">
                             <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
                             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filterlər</span>
                           </div>
 
-                          {uniqueBlocks.length > 0 && (
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1.5">Bina / Blok</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                <button type="button" onClick={() => setFilterBlock("all")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${filterBlock === "all" ? "bg-primary text-white border-primary shadow-sm" : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"}`}>
-                                  Hamısı
-                                </button>
-                                {uniqueBlocks.map((b: any) => (
-                                  <button key={b} type="button" onClick={() => setFilterBlock(b === filterBlock ? "all" : b)}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${filterBlock === b ? "bg-primary text-white border-primary shadow-sm" : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"}`}>
-                                    {b}
-                                  </button>
-                                ))}
-                              </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">Kvartal</p>
+                              <Select value={filterKvartal} onValueChange={(v) => { setFilterKvartal(v); setFilterBlock("all"); setValue('assetId', ''); }}>
+                                <SelectTrigger className="h-8 rounded-lg text-xs bg-white border-border/60">
+                                  <SelectValue placeholder="Hamısı" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Bütün Kvartallar</SelectItem>
+                                  {uniqueKvartals.map(q => (
+                                    <SelectItem key={q.id} value={q.id.toString()}>{q.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          )}
+
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">Blok / Bina</p>
+                              <Select value={filterBlock} onValueChange={(v) => { setFilterBlock(v); setValue('assetId', ''); }}>
+                                <SelectTrigger className="h-8 rounded-lg text-xs bg-white border-border/60">
+                                  <SelectValue placeholder="Hamısı" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Bütün Bloklar</SelectItem>
+                                  {filteredBlockOptions.map(b => (
+                                    <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
 
                           {uniqueRooms.length > 0 && (
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1.5">Otaq sayı</p>
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">Otaq sayı</p>
                               <div className="flex flex-wrap gap-1.5">
-                                <button type="button" onClick={() => setFilterRooms("all")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${filterRooms === "all" ? "bg-primary text-white border-primary shadow-sm" : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"}`}>
-                                  Hamısı
-                                </button>
+                                <FilterChip label="Hamısı" active={filterRooms === "all"} onClick={() => setFilterRooms("all")} />
                                 {uniqueRooms.map((r: any) => (
-                                  <button key={r} type="button" onClick={() => setFilterRooms(r.toString() === filterRooms ? "all" : r.toString())}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${filterRooms === r.toString() ? "bg-primary text-white border-primary shadow-sm" : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"}`}>
-                                    {r} otaq
-                                  </button>
+                                  <FilterChip key={r} label={`${r} otaq`}
+                                    active={filterRooms === r.toString()}
+                                    onClick={() => setFilterRooms(filterRooms === r.toString() ? "all" : r.toString())} />
                                 ))}
                               </div>
                             </div>
                           )}
 
                           {uniqueFloors.length > 0 && (
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1.5">Mərtəbə</p>
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">
+                                Mərtəbə
+                                {filterFloors.size > 0 && (
+                                  <span className="ml-1.5 text-primary font-medium">({filterFloors.size} seçilib)</span>
+                                )}
+                                <span className="ml-1.5 text-muted-foreground/50 font-normal text-[10px]">çox seçim mümkündür</span>
+                              </p>
                               <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
-                                <button type="button" onClick={() => setFilterFloor("all")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${filterFloor === "all" ? "bg-primary text-white border-primary shadow-sm" : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"}`}>
-                                  Hamısı
-                                </button>
                                 {uniqueFloors.map((f: any) => (
-                                  <button key={f} type="button" onClick={() => setFilterFloor(f.toString() === filterFloor ? "all" : f.toString())}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${filterFloor === f.toString() ? "bg-primary text-white border-primary shadow-sm" : "bg-white border-border/60 text-muted-foreground hover:border-primary/50"}`}>
-                                    {f}-ci
-                                  </button>
+                                  <FilterChip key={f} label={`${f}-ci`}
+                                    active={filterFloors.has(f)}
+                                    onClick={() => toggleFloor(f)} />
                                 ))}
                               </div>
                             </div>
@@ -374,7 +394,7 @@ export default function CreateSalePage() {
                             <Input
                               value={assetSearch}
                               onChange={(e) => setAssetSearch(e.target.value)}
-                              placeholder="Mənzil nömrəsi, blok..."
+                              placeholder="Mənzil nömrəsi ilə axtarış..."
                               className="rounded-lg h-8 bg-white pl-8 text-xs border-border/60"
                             />
                           </div>
@@ -384,13 +404,9 @@ export default function CreateSalePage() {
                       {watchAssetType !== 'apartment' && (
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                          <Input
-                            value={assetSearch}
-                            onChange={(e) => setAssetSearch(e.target.value)}
-                            placeholder="Axtarış..."
-                            className="rounded-xl h-10 bg-slate-50 pl-9 text-sm"
-                            disabled={!watchAssetType}
-                          />
+                          <Input value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
+                            placeholder="Axtarış..." className="rounded-xl h-10 bg-slate-50 pl-9 text-sm"
+                            disabled={!watchAssetType} />
                         </div>
                       )}
 
@@ -398,7 +414,7 @@ export default function CreateSalePage() {
                         {!watchAssetType ? (
                           <p className="text-sm text-muted-foreground text-center py-6">Əvvəlcə aktiv növünü seçin</p>
                         ) : filteredAssets.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-6">Boş aktiv tapılmadı</p>
+                          <p className="text-sm text-muted-foreground text-center py-6">Bu filterlərə uyğun boş aktiv tapılmadı</p>
                         ) : (
                           <div className="grid grid-cols-2 gap-2">
                             {filteredAssets.map((a: any) => {
@@ -409,9 +425,7 @@ export default function CreateSalePage() {
                                   type="button"
                                   onClick={() => field.onChange(a.id.toString())}
                                   className={`text-left rounded-lg border-2 px-3 py-2.5 transition-all cursor-pointer hover:border-primary/50 hover:bg-white ${
-                                    isSelected
-                                      ? "border-primary bg-primary/5 shadow-sm"
-                                      : "border-border/50 bg-white"
+                                    isSelected ? "border-primary bg-primary/5 shadow-sm" : "border-border/50 bg-white"
                                   }`}
                                 >
                                   {watchAssetType === 'apartment' ? (
@@ -509,7 +523,6 @@ export default function CreateSalePage() {
                   <p className="text-sm text-muted-foreground">Ümumi Məbləğ</p>
                   <p className="text-3xl font-display font-bold text-foreground mt-1">{formatCurrency(calcResult.total)}</p>
                 </div>
-                
                 {watchSaleType === 'credit' && (
                   <>
                     <div>
@@ -526,7 +539,6 @@ export default function CreateSalePage() {
                     </div>
                   </>
                 )}
-
                 <Button type="submit" disabled={loading || !watchAssetId} className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all mt-6">
                   {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Satışı Təsdiqlə"}
                 </Button>
