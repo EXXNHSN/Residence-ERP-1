@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -363,36 +362,41 @@ function BuildingRow({ building, isAdmin, username, onRefresh }: {
 
   return (
     <>
-      <div className="border border-border/60 rounded-lg overflow-hidden">
-        <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
-          <button type="button" className="flex items-center gap-3 flex-1 text-left"
+      {/* Building row */}
+      <div className={cn("bg-background", expanded && "bg-muted/10")}>
+        <div className="flex items-center gap-2 px-5 py-3 hover:bg-muted/30 transition-colors">
+          <button type="button" className="flex items-center gap-2.5 flex-1 text-left min-w-0"
             onClick={() => setExpanded((v) => !v)}>
-            {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-            <Building2 className="w-4 h-4 text-primary" />
-            <span className="font-medium flex-1">{building.name} Binası</span>
-            <span className="text-sm text-muted-foreground">{building.blockCount} blok</span>
-            <span className="text-sm text-muted-foreground ml-3">{building.apartmentCount} mənzil</span>
+            {expanded
+              ? <ChevronDown className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
+            <Building2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+            <span className="font-medium text-sm text-foreground flex-1 truncate">{building.name} Binası</span>
+            <span className="text-xs text-muted-foreground flex-shrink-0">{building.blockCount} blok</span>
+            <span className="text-xs text-muted-foreground flex-shrink-0 ml-3">{building.apartmentCount} mənzil</span>
           </button>
           {isAdmin && (
-            <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary ml-2"
-              onClick={(e) => { e.stopPropagation(); setEditBuildingName(building.name); setEditBuildingOpen(true); }}>
-              <Pencil className="w-3.5 h-3.5" />
-            </Button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditBuildingName(building.name); setEditBuildingOpen(true); }}
+              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors ml-1 flex-shrink-0">
+              <Pencil className="w-3 h-3" />
+            </button>
           )}
         </div>
         {expanded && building.blocks.length > 0 && (
-          <div className="px-4 pb-3 space-y-2">
+          <div className="pb-2">
             {building.blocks.map((bl) => (
-              <div key={bl.id} className="flex items-center gap-3 text-sm py-1.5 px-3 rounded-lg bg-muted/20">
-                <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="flex-1 font-medium">{bl.name}</span>
-                <span className="text-muted-foreground">{bl.floors} mərtəbə</span>
-                <span className="text-muted-foreground ml-3">{bl.apartmentCount} mənzil</span>
+              <div key={bl.id} className="flex items-center gap-2 py-2 pl-12 pr-5 hover:bg-muted/20 transition-colors">
+                <GitBranch className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" />
+                <span className="flex-1 text-xs font-medium text-foreground/80 truncate">{bl.name}</span>
+                <span className="text-xs text-muted-foreground flex-shrink-0">{bl.floors} mərtəbə</span>
+                <span className="text-xs text-muted-foreground flex-shrink-0 ml-3">{bl.apartmentCount} mənzil</span>
                 {isAdmin && (
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary"
-                    onClick={() => { setEditingBlock(bl); setEditBlockName(bl.name); setEditBlockOpen(true); }}>
-                    <Pencil className="w-3 h-3" />
-                  </Button>
+                  <button
+                    onClick={() => { setEditingBlock(bl); setEditBlockName(bl.name); setEditBlockOpen(true); }}
+                    className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors ml-1 flex-shrink-0">
+                    <Pencil className="w-2.5 h-2.5" />
+                  </button>
                 )}
               </div>
             ))}
@@ -526,71 +530,85 @@ function QuarterCard({ quarter }: { quarter: Quarter }) {
 
   return (
     <>
-      <Card className="hover:shadow-md transition-shadow">
-        <CardContent className="pt-5 pb-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-display font-bold text-xl">
-              {quarter.name}
+      <div className="bg-white rounded-2xl border border-border/60 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+        {/* Card header */}
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-base text-foreground leading-tight truncate">
+                {quarter.name} Kvartali
+              </h3>
+              {quarter.description && (
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{quarter.description}</p>
+              )}
             </div>
             {isAdmin && (
-              <div className="flex items-center gap-1">
-                <Button size="icon" variant="ghost" onClick={() => { setEditName(quarter.name); setEditDesc(quarter.description ?? ""); setEditQuarterOpen(true); }}
-                  className="text-muted-foreground hover:text-primary h-8 w-8">
+              <div className="flex items-center gap-0.5 ml-2 flex-shrink-0">
+                <button
+                  onClick={() => { setEditName(quarter.name); setEditDesc(quarter.description ?? ""); setEditQuarterOpen(true); }}
+                  className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
                   <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => setDeleteDialogOpen(true)}
-                  className="text-destructive h-8 w-8">
+                </button>
+                <button
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                </button>
               </div>
             )}
           </div>
 
-          <h3 className="font-bold text-lg">{quarter.name} Kvartali</h3>
-          {quarter.description && <p className="text-sm text-muted-foreground mt-1">{quarter.description}</p>}
-
-          <div className="flex gap-4 mt-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <Building2 className="w-4 h-4" /><span>{quarter.buildingCount} bina</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Home className="w-4 h-4" /><span>{quarter.apartmentCount} mənzil</span>
-            </div>
+          {/* Stats */}
+          <div className="flex items-center gap-2 mt-3">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted/60 rounded-lg px-2.5 py-1">
+              <Building2 className="w-3.5 h-3.5" />{quarter.buildingCount} bina
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted/60 rounded-lg px-2.5 py-1">
+              <Home className="w-3.5 h-3.5" />{quarter.apartmentCount} mənzil
+            </span>
           </div>
+        </div>
 
-          <div className="mt-4 flex items-center gap-2">
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7 flex-1"
-              onClick={() => setExpanded((v) => !v)}>
-              {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              Binaları gör
-            </Button>
-            {isAdmin && (
-              <Button size="sm" className="gap-1.5 text-xs h-7 flex-1"
-                onClick={() => setBuildingDialogOpen(true)}>
-                <Plus className="w-3.5 h-3.5" /> Yeni bina
-              </Button>
-            )}
-          </div>
+        {/* Footer actions */}
+        <div className="border-t border-border/50 px-4 py-2.5 bg-muted/20 flex items-center gap-2">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex-1">
+            {expanded
+              ? <ChevronDown className="w-3.5 h-3.5 text-primary" />
+              : <ChevronRight className="w-3.5 h-3.5" />}
+            <span className={cn("transition-colors", expanded && "text-primary")}>Binaları gör</span>
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setBuildingDialogOpen(true)}
+              className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Yeni bina
+            </button>
+          )}
+        </div>
 
-          {expanded && (
-            <div className="mt-4 space-y-2">
-              {isLoading ? (
-                <div className="text-xs text-muted-foreground py-2 text-center">Yüklənir...</div>
-              ) : buildings.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-2 text-center">Hələ bina yoxdur</div>
-              ) : (
-                buildings.map((b) => (
+        {/* Expanded buildings list */}
+        {expanded && (
+          <div className="border-t border-border/40">
+            {isLoading ? (
+              <div className="text-xs text-muted-foreground py-4 text-center">Yüklənir...</div>
+            ) : buildings.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-4 text-center">Hələ bina yoxdur</div>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {buildings.map((b) => (
                   <BuildingRow key={b.id} building={b}
                     isAdmin={isAdmin}
                     username={user?.username ?? ""}
                     onRefresh={() => qc.invalidateQueries({ queryKey: ["buildings", quarter.id] })}
                   />
-                ))
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Delete dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={(o) => { setDeleteDialogOpen(o); if (!o) setDeletePassword(""); }}>
