@@ -21,6 +21,7 @@ import GaragesPage from "@/pages/garages/index";
 import RentalsPage from "@/pages/rentals/index";
 import CommunalPage from "@/pages/communal/index";
 import InternetPage from "@/pages/internet/index";
+import TvPage from "@/pages/tv/index";
 import TariffsPage from "@/pages/tariffs/index";
 import AdminSetupPage from "@/pages/admin/Setup";
 import AdminUsersPage from "@/pages/admin/Users";
@@ -57,6 +58,7 @@ function AppRoutes() {
           <Route path="/rentals" component={RentalsPage} />
           <Route path="/communal" component={CommunalPage} />
           <Route path="/internet" component={InternetPage} />
+          <Route path="/tv" component={TvPage} />
           <Route path="/tariffs" component={TariffsPage} />
           <Route path="/quarters" component={QuartersPage} />
           <Route path="/admin/setup" component={AdminSetupPage} />

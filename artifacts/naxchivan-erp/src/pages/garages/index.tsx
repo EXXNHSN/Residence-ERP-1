@@ -7,16 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Car, Settings2, Loader2, Building2, CheckCircle2, Lock, Key, ChevronRight, Layers } from "lucide-react";
+import { Car, Settings2, Loader2, Building2, CheckCircle2, Lock, Key, Layers, Trash2, ShieldAlert } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListObjectsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
-function SpotCard({ spot, onAction }: { spot: any; onAction: (spot: any) => void }) {
+function SpotCard({ spot, onAction, deleteMode, onDelete }: {
+  spot: any;
+  onAction: (spot: any) => void;
+  deleteMode?: boolean;
+  onDelete?: (spot: any) => void;
+}) {
   const colors: Record<string, string> = {
     available: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
     sold: "bg-rose-50 border-rose-200 text-rose-700",
@@ -28,6 +34,23 @@ function SpotCard({ spot, onAction }: { spot: any; onAction: (spot: any) => void
     rented: Key,
   };
   const Icon = icons[spot.status] ?? Car;
+
+  if (deleteMode) {
+    return (
+      <button
+        onClick={() => onDelete?.(spot)}
+        className="rounded-xl border-2 p-3 text-left transition-all cursor-pointer bg-red-50 border-red-200 text-red-600 hover:bg-red-100 relative group"
+      >
+        <div className="flex items-center gap-1.5 mb-1">
+          <Trash2 className="w-3.5 h-3.5 opacity-70" />
+          <span className="text-xs font-bold">{spot.number}</span>
+        </div>
+        <div className="text-xs opacity-70">
+          {spot.status === "available" ? "Boş" : spot.status === "sold" ? "Satılıb" : "İcarədə"}
+        </div>
+      </button>
+    );
+  }
 
   return (
     <button
@@ -47,7 +70,7 @@ function SpotCard({ spot, onAction }: { spot: any; onAction: (spot: any) => void
 }
 
 export default function GaragesPage() {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -57,6 +80,8 @@ export default function GaragesPage() {
 
   const [filterKvartal, setFilterKvartal] = useState("all");
   const [filterBlock, setFilterBlock] = useState("all");
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [deleteSpot, setDeleteSpot] = useState<any | null>(null);
 
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupKvartal, setSetupKvartal] = useState("all");
@@ -147,9 +172,35 @@ export default function GaragesPage() {
   }
 
   function handleSpotAction(spot: any) {
-    // Spot selection handled in a potential future rental/sale dialog
-    // For now just notify
     toast({ title: `${spot.number} seçildi`, description: "Satış üçün Satışlar → Yeni Satış, İcarə üçün İcarə menyusuna keçin." });
+  }
+
+  async function handleDeleteSpot(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/objects/${deleteSpot.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: adminPassword }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? "Silmə xətası"); }
+    queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
+    toast({ title: `${deleteSpot.number} silindi` });
+    setDeleteSpot(null);
+  }
+
+  function renderSpotGrid(spots: any[]) {
+    return (
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+        {spots.map((spot: any) => (
+          <SpotCard
+            key={spot.id}
+            spot={spot}
+            onAction={handleSpotAction}
+            deleteMode={deleteMode}
+            onDelete={setDeleteSpot}
+          />
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -161,11 +212,29 @@ export default function GaragesPage() {
             <p className="text-muted-foreground mt-1">Blok altı 2 mərtəbəli avtomobil dayanacaqları</p>
           </div>
           {isAdmin && (
-            <Button onClick={() => setSetupOpen(true)} className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-              <Settings2 className="w-4 h-4 mr-2" /> Avto Dayanacaq Qurğusu
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={deleteMode ? "destructive" : "outline"}
+                onClick={() => setDeleteMode(d => !d)}
+                className="rounded-xl px-4"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleteMode ? "Silmə Rejimindən Çıx" : "Yer Sil"}
+              </Button>
+              <Button onClick={() => setSetupOpen(true)} className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
+                <Settings2 className="w-4 h-4 mr-2" /> Yeni Qurğu
+              </Button>
+            </div>
           )}
         </div>
+
+        {/* Delete mode banner */}
+        {deleteMode && (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+            <span><strong>Silmə rejimi aktiv.</strong> Silmək istədiyiniz dayanacaq yerinə klikləyin. Admin şifrəsi tələb olunacaq.</span>
+          </div>
+        )}
 
         {/* Pricing info */}
         {tariffs && (
@@ -251,7 +320,6 @@ export default function GaragesPage() {
           </Card>
         ) : hasFloorData ? (
           <div className="space-y-4">
-            {/* Floor 1 */}
             <Card className="border-none shadow-lg shadow-black/5">
               <CardHeader className="border-b border-border/50 pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -260,16 +328,9 @@ export default function GaragesPage() {
                   <Badge variant="outline" className="ml-2 text-xs">{floor1.length} yer</Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                  {floor1.map((spot: any) => (
-                    <SpotCard key={spot.id} spot={spot} onAction={handleSpotAction} />
-                  ))}
-                </div>
-              </CardContent>
+              <CardContent className="p-4">{renderSpotGrid(floor1)}</CardContent>
             </Card>
 
-            {/* Floor 2 */}
             {floor2.length > 0 && (
               <Card className="border-none shadow-lg shadow-black/5">
                 <CardHeader className="border-b border-border/50 pb-3">
@@ -279,18 +340,11 @@ export default function GaragesPage() {
                     <Badge variant="outline" className="ml-2 text-xs">{floor2.length} yer</Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                    {floor2.map((spot: any) => (
-                      <SpotCard key={spot.id} spot={spot} onAction={handleSpotAction} />
-                    ))}
-                  </div>
-                </CardContent>
+                <CardContent className="p-4">{renderSpotGrid(floor2)}</CardContent>
               </Card>
             )}
           </div>
         ) : (
-          // Legacy view without floor data — grouped by block
           <div className="space-y-4">
             {(() => {
               const byBlock = new Map<string, any[]>();
@@ -309,13 +363,7 @@ export default function GaragesPage() {
                       <Badge variant="outline" className="ml-2 text-xs">{spots.length} yer</Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                      {spots.map((spot: any) => (
-                        <SpotCard key={spot.id} spot={spot} onAction={handleSpotAction} />
-                      ))}
-                    </div>
-                  </CardContent>
+                  <CardContent className="p-4">{renderSpotGrid(spots)}</CardContent>
                 </Card>
               ));
             })()}
@@ -323,7 +371,7 @@ export default function GaragesPage() {
         )}
 
         {/* Legend */}
-        {filteredGarages.length > 0 && (
+        {filteredGarages.length > 0 && !deleteMode && (
           <div className="flex items-center gap-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-200 inline-block" /> Boş (klik ilə satış/icarəyə yönləndirir)</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-200 inline-block" /> Satılıb</span>
@@ -331,6 +379,25 @@ export default function GaragesPage() {
           </div>
         )}
       </div>
+
+      {/* Delete spot dialog */}
+      <AdminEditDialog
+        open={!!deleteSpot}
+        onClose={() => setDeleteSpot(null)}
+        title={`Silinsin: ${deleteSpot?.number ?? ""}`}
+        saveLabel="Sil"
+        saveVariant="destructive"
+        onSave={handleDeleteSpot}
+      >
+        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+          <strong>{deleteSpot?.number}</strong> dayanacaq yeri silinəcək.
+          {deleteSpot?.status !== "available" && (
+            <div className="mt-2 font-semibold">
+              ⚠️ Bu yer hal-hazırda <em>{deleteSpot?.status === "sold" ? "satılıb" : "icarədədir"}</em>. Silinmədən əvvəl bağlı qeydlər yoxlanılmalıdır.
+            </div>
+          )}
+        </div>
+      </AdminEditDialog>
 
       {/* Garage Setup Dialog */}
       <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
@@ -349,9 +416,7 @@ export default function GaragesPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Kvartal</label>
               <Select value={setupKvartal} onValueChange={v => { setSetupKvartal(v); setSetupBlock(""); }}>
-                <SelectTrigger className="rounded-xl h-11">
-                  <SelectValue placeholder="Kvartal seçin..." />
-                </SelectTrigger>
+                <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Kvartal seçin..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Bütün kvartallar</SelectItem>
                   {uniqueKvartals.map(q => (
@@ -364,9 +429,7 @@ export default function GaragesPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Blok</label>
               <Select value={setupBlock} onValueChange={setSetupBlock}>
-                <SelectTrigger className="rounded-xl h-11">
-                  <SelectValue placeholder="Blok seçin..." />
-                </SelectTrigger>
+                <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
                 <SelectContent>
                   {filteredBlocksForSetup.map(b => (
                     <SelectItem key={b.id} value={b.id.toString()}>
