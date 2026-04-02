@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { rentalsTable, customersTable, objectsTable, objectPaymentsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
 
@@ -130,6 +131,46 @@ router.put("/:id", async (req, res) => {
   }
 
   res.json(await enrichRental(updated));
+});
+
+// Terminate (end) a rental — admin password required
+router.put("/:id/terminate", async (req, res) => {
+  const { username, password } = req.body;
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const [rental] = await db.select().from(rentalsTable).where(eq(rentalsTable.id, Number(req.params.id))).limit(1);
+  if (!rental) return res.status(404).json({ error: "İcarə tapılmadı" });
+
+  const [updated] = await db
+    .update(rentalsTable)
+    .set({ status: "ended" })
+    .where(eq(rentalsTable.id, rental.id))
+    .returning();
+
+  // Free up the object
+  await db.update(objectsTable).set({ status: "available" }).where(eq(objectsTable.id, rental.assetId));
+
+  res.json(await enrichRental(updated));
+});
+
+// Delete a rental — admin password required
+router.delete("/:id", async (req, res) => {
+  const { username, password } = req.body;
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const [rental] = await db.select().from(rentalsTable).where(eq(rentalsTable.id, Number(req.params.id))).limit(1);
+  if (!rental) return res.status(404).json({ error: "İcarə tapılmadı" });
+
+  // Delete all payment records for this rental
+  await db.delete(objectPaymentsTable).where(eq(objectPaymentsTable.rentalId, rental.id));
+
+  // Delete the rental
+  await db.delete(rentalsTable).where(eq(rentalsTable.id, rental.id));
+
+  // Free up the object
+  await db.update(objectsTable).set({ status: "available" }).where(eq(objectsTable.id, rental.assetId));
+
+  res.json({ success: true });
 });
 
 export default router;

@@ -7,12 +7,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2, User, Phone, FileText, ChevronDown, ChevronUp, CheckCircle2, Clock, Car, Store, Search } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, Loader2, User, Phone, FileText, ChevronDown, ChevronUp, CheckCircle2, Clock, Car, Store, Search, MoreVertical, Square, Trash2, AlertTriangle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -21,6 +24,7 @@ export default function RentalsPage() {
   const { data: objects } = useListObjects({ status: ObjectStatus.available });
   const { data: customers } = useListCustomers();
   const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -29,6 +33,12 @@ export default function RentalsPage() {
   const [filterType, setFilterType] = useState<string>("all");
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+
+  // Terminate / Delete state
+  const [terminateOpen, setTerminateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [actionRental, setActionRental] = useState<any>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const { register, handleSubmit, control, reset, watch, setValue } = useForm({
     defaultValues: {
@@ -144,6 +154,44 @@ export default function RentalsPage() {
         ...prev,
         [rentalId]: prev[rentalId].map(p => p.id === updated.id ? updated : p),
       }));
+    }
+  }
+
+  async function handleTerminate(adminPassword: string) {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${BASE()}/api/rentals/${actionRental.id}/terminate`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user?.username, password: adminPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Xəta" }));
+        throw new Error(err.error ?? "Xəta baş verdi");
+      }
+      toast({ title: "İcarə dayandırıldı", description: `${actionRental.assetDescription} — status "bitdi" olaraq dəyişdi, dayanacaq boş göstərilir.` });
+      refetch();
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleDelete(adminPassword: string) {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${BASE()}/api/rentals/${actionRental.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user?.username, password: adminPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Xəta" }));
+        throw new Error(err.error ?? "Xəta baş verdi");
+      }
+      toast({ title: "İcarə silindi", description: `${actionRental.assetDescription} üçün icarə müqaviləsi silindi.` });
+      refetch();
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -391,7 +439,7 @@ export default function RentalsPage() {
                   <TableHead>Aylıq Kira</TableHead>
                   <TableHead>Ödənişlər</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
+                  <TableHead className="w-[120px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -460,12 +508,38 @@ export default function RentalsPage() {
                       </TableCell>
                       <TableCell><StatusBadge status={rental.status} type="rental" /></TableCell>
                       <TableCell>
-                        <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
-                          onClick={() => loadPayments(rental.id)}>
-                          {loadingPayments[rental.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
-                            expandedId === rental.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          <span className="ml-1">Ödənişlər</span>
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
+                            onClick={() => loadPayments(rental.id)}>
+                            {loadingPayments[rental.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                              expandedId === rental.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            <span className="ml-1">Ödənişlər</span>
+                          </Button>
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                {rental.status === "active" && (
+                                  <DropdownMenuItem
+                                    className="text-amber-600 focus:text-amber-600 focus:bg-amber-50 cursor-pointer gap-2"
+                                    onClick={() => { setActionRental(rental); setTerminateOpen(true); }}>
+                                    <Square className="w-4 h-4" /> İcarəni Dayandır
+                                  </DropdownMenuItem>
+                                )}
+                                {rental.status === "active" && <DropdownMenuSeparator />}
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
+                                  onClick={() => { setActionRental(rental); setDeleteOpen(true); }}>
+                                  <Trash2 className="w-4 h-4" /> Sil
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
 
@@ -507,6 +581,45 @@ export default function RentalsPage() {
           )}
         </div>
       </div>
+      {/* Terminate Rental Dialog */}
+      <AdminEditDialog open={terminateOpen} onClose={() => setTerminateOpen(false)}
+        title="İcarəni Dayandır" onSave={handleTerminate} saveLabel="Dayandır" saveVariant="destructive">
+        {actionRental && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Aşağıdakı icarəni dayandırmaq istədiyinizə əminsiniz?</p>
+            <div className="flex items-center gap-3 bg-amber-50 text-amber-700 rounded-xl px-4 py-3 font-semibold text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {actionRental.assetDescription || actionRental.assetId}
+              {actionRental.customerFirstName && (
+                <span className="text-amber-600 font-normal ml-1">— {actionRental.customerFirstName} {actionRental.customerLastName}</span>
+              )}
+            </div>
+            <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
+              İcarə dayandırıldıqdan sonra obyekt yenidən boş olaraq göstərilir. Ödəniş tarixçəsi silinmir.
+            </p>
+          </div>
+        )}
+      </AdminEditDialog>
+
+      {/* Delete Rental Dialog */}
+      <AdminEditDialog open={deleteOpen} onClose={() => setDeleteOpen(false)}
+        title="İcarəni Sil" onSave={handleDelete} saveLabel="Sil" saveVariant="destructive">
+        {actionRental && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Aşağıdakı icarəni tamamilə silmək istədiyinizə əminsiniz?</p>
+            <div className="flex items-center gap-3 bg-destructive/10 text-destructive rounded-xl px-4 py-3 font-semibold text-sm">
+              <Trash2 className="w-4 h-4 shrink-0" />
+              {actionRental.assetDescription || actionRental.assetId}
+              {actionRental.customerFirstName && (
+                <span className="text-destructive/70 font-normal ml-1">— {actionRental.customerFirstName} {actionRental.customerLastName}</span>
+              )}
+            </div>
+            <p className="text-xs text-red-700 bg-red-50 rounded-xl px-3 py-2">
+              İcarə silinəndə ona aid bütün ödəniş qeydləri də silinir. Bu əməliyyat geri qaytarıla bilməz.
+            </p>
+          </div>
+        )}
+      </AdminEditDialog>
     </AppLayout>
   );
 }
