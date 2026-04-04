@@ -45,37 +45,89 @@ router.get("/summary", async (_req, res) => {
   // ── Sales Revenue ──
   const allSales = await db.select().from(salesTable);
   const totalSales = allSales.length;
-  const cashSales = allSales.filter((s) => s.saleType === "cash").length;
+
+  // Per-type counts
+  const aptCashSales   = allSales.filter((s) => s.saleType === "cash"   && s.assetType === "apartment").length;
+  const aptCreditSales = allSales.filter((s) => s.saleType === "credit" && s.assetType === "apartment").length;
+  // Legacy fields (kept for backward compat)
+  const cashSales   = allSales.filter((s) => s.saleType === "cash").length;
   const creditSales = allSales.filter((s) => s.saleType === "credit").length;
 
+  // Apartment cash sales — totalAmount already equals paidAmount for cash
   const cashSalesRevenue = allSales
     .filter((s) => s.saleType === "cash" && s.assetType === "apartment")
     .reduce((sum, s) => sum + Number(s.totalAmount), 0);
 
+  // Apartment credit: only down payments (installments counted separately below)
   const downPaymentRevenue = allSales
     .filter((s) => s.saleType === "credit" && s.assetType === "apartment")
     .reduce((sum, s) => sum + Number(s.downPayment ?? 0), 0);
 
-  // Garage sale revenue (from all garage sales)
+  // Garage sales (cash totalAmount + credit totalAmount — all garage sales revenue as listed)
   const garageSaleRevenue = allSales
     .filter((s) => s.assetType === "garage")
     .reduce((sum, s) => sum + Number(s.totalAmount ?? 0), 0);
 
-  // Object sale revenue
+  // Object (qeyri yaşayış) sales revenue
   const objectSaleRevenue = allSales
     .filter((s) => s.assetType === "object")
     .reduce((sum, s) => sum + Number(s.totalAmount ?? 0), 0);
 
-  // ── Installments ──
+  // ── Installments — join with sales to split by asset type ──
+  const allInstallmentsWithType = await db
+    .select({
+      id: installmentsTable.id,
+      amount: installmentsTable.amount,
+      status: installmentsTable.status,
+      dueDate: installmentsTable.dueDate,
+      paidDate: installmentsTable.paidDate,
+      assetType: salesTable.assetType,
+    })
+    .from(installmentsTable)
+    .innerJoin(salesTable, eq(installmentsTable.saleId, salesTable.id));
+
+  // For backward-compat we still need a plain allInstallments for overdue update above
   const allInstallments = await db.select().from(installmentsTable);
   const pendingInstallments = allInstallments.filter((i) => i.status === "pending").length;
   const overdueInstallments = allInstallments.filter((i) => i.status === "overdue").length;
 
-  const creditInstallmentIncome = allInstallments
-    .filter((i) => i.status === "paid")
+  // Apartment credit installments paid — these are the true "kredit taksit gəliri" for apartments
+  const creditInstallmentIncome = allInstallmentsWithType
+    .filter((i) => i.status === "paid" && i.assetType === "apartment")
     .reduce((sum, i) => sum + Number(i.amount), 0);
 
-  const totalRevenue = cashSalesRevenue + downPaymentRevenue + creditInstallmentIncome;
+  // Garage credit installments (if any garage was sold on credit)
+  const garageInstallmentIncome = allInstallmentsWithType
+    .filter((i) => i.status === "paid" && i.assetType === "garage")
+    .reduce((sum, i) => sum + Number(i.amount), 0);
+
+  // Object credit installments
+  const objectInstallmentIncome = allInstallmentsWithType
+    .filter((i) => i.status === "paid" && i.assetType === "object")
+    .reduce((sum, i) => sum + Number(i.amount), 0);
+
+  // Grand total received across all asset types:
+  // = apartment (cash + downPayment + paid installments)
+  // + garage (cash totalAmount treated as paid, + any credit installments)
+  // + object (same)
+  const aptTotalReceived = cashSalesRevenue + downPaymentRevenue + creditInstallmentIncome;
+  const garageTotalReceived = allSales
+    .filter((s) => s.saleType === "cash" && s.assetType === "garage")
+    .reduce((sum, s) => sum + Number(s.totalAmount), 0)
+    + allSales
+    .filter((s) => s.saleType === "credit" && s.assetType === "garage")
+    .reduce((sum, s) => sum + Number(s.downPayment ?? 0), 0)
+    + garageInstallmentIncome;
+  const objectTotalReceived = allSales
+    .filter((s) => s.saleType === "cash" && s.assetType === "object")
+    .reduce((sum, s) => sum + Number(s.totalAmount), 0)
+    + allSales
+    .filter((s) => s.saleType === "credit" && s.assetType === "object")
+    .reduce((sum, s) => sum + Number(s.downPayment ?? 0), 0)
+    + objectInstallmentIncome;
+  const grandTotalReceived = aptTotalReceived + garageTotalReceived + objectTotalReceived;
+
+  const totalRevenue = aptTotalReceived; // apartment-only revenue (for existing usages)
 
   const paidThisMonth = allInstallments
     .filter(
@@ -180,16 +232,28 @@ router.get("/summary", async (_req, res) => {
     availableGarages,
     soldGarages,
     rentedGarages,
-    // Sales
+    // Sales — counts
     totalSales,
     cashSales,
     creditSales,
-    totalRevenue: Math.round(totalRevenue * 100) / 100,
+    aptCashSales,
+    aptCreditSales,
+    // Sales — apartment revenue (correctly apartment-only)
+    totalRevenue: Math.round(aptTotalReceived * 100) / 100,
     cashSalesRevenue: Math.round(cashSalesRevenue * 100) / 100,
     downPaymentRevenue: Math.round(downPaymentRevenue * 100) / 100,
     creditInstallmentIncome: Math.round(creditInstallmentIncome * 100) / 100,
+    aptTotalReceived: Math.round(aptTotalReceived * 100) / 100,
+    // Garage revenue
     garageSaleRevenue: Math.round(garageSaleRevenue * 100) / 100,
+    garageTotalReceived: Math.round(garageTotalReceived * 100) / 100,
+    garageInstallmentIncome: Math.round(garageInstallmentIncome * 100) / 100,
+    // Object (qeyri yaşayış) sale revenue
     objectSaleRevenue: Math.round(objectSaleRevenue * 100) / 100,
+    objectTotalReceived: Math.round(objectTotalReceived * 100) / 100,
+    objectInstallmentIncome: Math.round(objectInstallmentIncome * 100) / 100,
+    // Grand total received across all asset types
+    grandTotalReceived: Math.round(grandTotalReceived * 100) / 100,
     // Installments
     pendingInstallments,
     overdueInstallments,

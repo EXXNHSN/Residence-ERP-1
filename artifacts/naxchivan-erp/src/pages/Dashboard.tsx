@@ -162,14 +162,30 @@ export default function Dashboard() {
               {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              <RevenueCard icon={Banknote} iconBg="bg-emerald-100/60" iconColor="text-emerald-600"
-                label="Nağd Satış" amount={stats?.cashSalesRevenue ?? 0} sub={`${stats?.cashSales ?? 0} satış`} />
-              <RevenueCard icon={Wallet} iconBg="bg-blue-100/60" iconColor="text-blue-600"
-                label="İlkin Ödəniş (Kredit)" amount={stats?.downPaymentRevenue ?? 0} sub={`${stats?.creditSales ?? 0} kredit sakin`} />
-              <RevenueCard icon={CreditCard} iconBg="bg-violet-100/60" iconColor="text-violet-600"
-                label="Kredit Taksit Gəliri" amount={stats?.creditInstallmentIncome ?? 0}
-                sub={`Cəmi: ${formatCurrency((stats?.cashSalesRevenue ?? 0) + (stats?.downPaymentRevenue ?? 0) + (stats?.creditInstallmentIncome ?? 0))}`} />
+            <div className="space-y-3 mt-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <RevenueCard icon={Banknote} iconBg="bg-emerald-100/60" iconColor="text-emerald-600"
+                  label="Nağd Satış (mənzil)"
+                  amount={(stats as any)?.cashSalesRevenue ?? 0}
+                  sub={`${(stats as any)?.aptCashSales ?? 0} mənzil nağd satılıb`} />
+                <RevenueCard icon={Wallet} iconBg="bg-blue-100/60" iconColor="text-blue-600"
+                  label="İlkin Ödəniş (kredit)"
+                  amount={(stats as any)?.downPaymentRevenue ?? 0}
+                  sub={`${(stats as any)?.aptCreditSales ?? 0} mənzil kreditlə`} />
+                <RevenueCard icon={CreditCard} iconBg="bg-violet-100/60" iconColor="text-violet-600"
+                  label="Kredit Taksit Gəliri"
+                  amount={(stats as any)?.creditInstallmentIncome ?? 0}
+                  sub={`Mənzil cəmi: ${formatCurrency(((stats as any)?.aptTotalReceived ?? 0))}`} />
+              </div>
+              {/* Grand total bar */}
+              <div className="rounded-xl bg-primary/5 border border-primary/20 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  <span>Bütün aktivlər üzrə toplam daxil olan gəlir</span>
+                  <span className="text-xs text-muted-foreground/60">(mənzil + qaraj + qeyri yaşayış)</span>
+                </div>
+                <span className="text-xl font-bold text-primary">{formatCurrency((stats as any)?.grandTotalReceived ?? 0)}</span>
+              </div>
             </div>
           )}
         </SectionAccordion>
