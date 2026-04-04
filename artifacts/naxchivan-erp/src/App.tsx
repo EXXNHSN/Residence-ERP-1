@@ -19,6 +19,7 @@ import CreditReportPage from "@/pages/sales/credits";
 import InstallmentsPage from "@/pages/installments/index";
 import GaragesPage from "@/pages/garages/index";
 import RentalsPage from "@/pages/rentals/index";
+import RentersPage from "@/pages/renters/index";
 import CommunalPage from "@/pages/communal/index";
 import InternetPage from "@/pages/internet/index";
 import TvPage from "@/pages/tv/index";
@@ -50,6 +51,7 @@ function AppRoutes() {
           <Route path="/objects" component={ObjectsPage} />
           <Route path="/customers" component={CustomersPage} />
           <Route path="/customers/:id" component={CustomerDetailPage} />
+          <Route path="/renters" component={RentersPage} />
           <Route path="/sales" component={SalesPage} />
           <Route path="/sales/create" component={CreateSalePage} />
           <Route path="/sales/credits" component={CreditReportPage} />

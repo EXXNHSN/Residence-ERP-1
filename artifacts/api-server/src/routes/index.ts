@@ -17,6 +17,7 @@ import buildingsRouter from "./buildings";
 import authRouter from "./auth";
 import adminRouter from "./admin";
 import floorPriceTiersRouter from "./floor_price_tiers";
+import rentersRouter from "./renters";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use("/stats", statsRouter);
 router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/floor-price-tiers", floorPriceTiersRouter);
+router.use("/renters", rentersRouter);
 
 export default router;

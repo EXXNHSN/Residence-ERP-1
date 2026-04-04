@@ -149,13 +149,29 @@ router.get("/:id", async (req, res) => {
       let assetDescription = `#${sale.assetId}`;
       let paymentCode: string | null = null;
 
+      let quarterName: string | null = null;
+      let buildingName: string | null = null;
+      let blockName: string | null = null;
+      let aptNumber: string | null = null;
+
       if (sale.assetType === "apartment") {
         const [apt] = await db
-          .select({ apt: apartmentsTable, blockName: blocksTable.name })
+          .select({
+            apt: apartmentsTable,
+            blockName: blocksTable.name,
+            buildingName: buildingsTable.name,
+            quarterName: quartersTable.name,
+          })
           .from(apartmentsTable)
           .leftJoin(blocksTable, eq(apartmentsTable.blockId, blocksTable.id))
+          .leftJoin(buildingsTable, eq(blocksTable.buildingId, buildingsTable.id))
+          .leftJoin(quartersTable, eq(buildingsTable.quarterId, quartersTable.id))
           .where(eq(apartmentsTable.id, sale.assetId));
         if (apt) {
+          blockName = apt.blockName;
+          buildingName = apt.buildingName;
+          quarterName = apt.quarterName;
+          aptNumber = String(apt.apt.number);
           assetDescription = `${apt.blockName} - Mənzil ${apt.apt.number}`;
           paymentCode = apt.apt.paymentCode ?? null;
         }
@@ -188,6 +204,10 @@ router.get("/:id", async (req, res) => {
         customerName: `${customer.firstName} ${customer.lastName}`,
         assetDescription,
         paymentCode,
+        quarterName,
+        buildingName,
+        blockName,
+        aptNumber,
         totalAmount,
         downPayment,
         monthlyPayment: Number(sale.monthlyPayment),

@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   Landmark,
+  Handshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -142,6 +143,7 @@ export function Sidebar() {
           <SectionDivider icon={Users} />
           <div className="space-y-0.5">
             <NavItem item={{ name: "Sakinlər", href: "/customers", icon: Users }} location={location} />
+            <NavItem item={{ name: "Arendatorlar", href: "/renters", icon: Handshake }} location={location} />
           </div>
         </div>
 
