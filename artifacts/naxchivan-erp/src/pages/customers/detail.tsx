@@ -2,15 +2,20 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useGetCustomer } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
-import { Loader2, ArrowLeft, Phone, MapPin, Hash, Pencil, CreditCard, Key } from "lucide-react";
+import {
+  Loader2, ArrowLeft, Phone, MapPin, Hash, Pencil,
+  CreditCard, Key, Home, Car, Store, ParkingCircle, Building2,
+  ChevronDown, ChevronUp, ShoppingBag, CalendarDays
+} from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +24,60 @@ import { getGetCustomerQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// ─── Status badge config (same as list page) ───────────────────────────────
+const BADGE_CONFIG = [
+  {
+    key: "apartment",
+    icon: Home,
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    label: "Mənzil sahibi",
+    gradientFrom: "from-blue-500",
+    gradientTo: "to-blue-400",
+  },
+  {
+    key: "objectSale",
+    icon: Building2,
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    label: "Qeyri yaşayış satın alıb",
+    gradientFrom: "from-emerald-500",
+    gradientTo: "to-emerald-400",
+  },
+  {
+    key: "garageSale",
+    icon: Car,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    label: "Avto dayanacaq sahibi",
+    gradientFrom: "from-indigo-600",
+    gradientTo: "to-indigo-400",
+  },
+  {
+    key: "garageRental",
+    icon: ParkingCircle,
+    color: "text-indigo-400",
+    bg: "bg-indigo-50/60",
+    border: "border-indigo-100",
+    label: "Avto dayanacaq icarəçisi",
+    gradientFrom: "from-indigo-400",
+    gradientTo: "to-sky-300",
+  },
+  {
+    key: "objectRental",
+    icon: Store,
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    label: "Qeyri yaşayış icarəçisi",
+    gradientFrom: "from-amber-500",
+    gradientTo: "to-orange-400",
+  },
+];
 
 function RentalStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
@@ -34,6 +93,54 @@ function RentalStatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Collapsible section wrapper ─────────────────────────────────────────────
+function CollapsibleSection({
+  icon: Icon,
+  title,
+  count,
+  iconColor,
+  children,
+  defaultOpen = false,
+}: {
+  icon: any;
+  title: string;
+  count: number;
+  iconColor: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card className="border-none shadow-lg shadow-black/5 overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${open ? "bg-primary/10" : "bg-muted"} transition-colors`}>
+            <Icon className={`w-4 h-4 ${open ? iconColor : "text-muted-foreground"}`} />
+          </div>
+          <span className="text-base font-semibold">{title}</span>
+          <Badge variant="secondary" className="rounded-full text-xs px-2 py-0 h-5">
+            {count}
+          </Badge>
+        </div>
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${open ? "bg-primary/10" : "bg-muted"}`}>
+          {open
+            ? <ChevronUp className={`w-4 h-4 ${open ? iconColor : "text-muted-foreground"}`} />
+            : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </div>
+      </button>
+      {open && (
+        <CardContent className="px-6 pb-6 pt-0 border-t border-border/40">
+          {children}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const { data: customer, isLoading, isError } = useGetCustomer(Number(id));
@@ -68,7 +175,7 @@ export default function CustomerDetailPage() {
         firstName: editFirstName,
         lastName: editLastName,
         phone: editPhone,
-        fin: editFin,
+        fin: editFin?.trim().toUpperCase() || null,
         address: editAddress,
       }),
     });
@@ -83,7 +190,6 @@ export default function CustomerDetailPage() {
   if (isLoading) {
     return <AppLayout><div className="flex justify-center p-24"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></AppLayout>;
   }
-
   if (isError || !customer) {
     return <AppLayout><div className="text-center text-destructive p-12">Sakin tapılmadı</div></AppLayout>;
   }
@@ -91,223 +197,308 @@ export default function CustomerDetailPage() {
   const rentals = (customer as any).rentals ?? [];
   const sales = customer.sales ?? [];
 
+  // Compute badges from sales + rentals
+  const badges: Record<string, boolean> = {
+    apartment: sales.some((s: any) => s.assetType === "apartment"),
+    garageSale: sales.some((s: any) => s.assetType === "garage"),
+    objectSale: sales.some((s: any) => s.assetType === "object"),
+    garageRental: rentals.some((r: any) => r.assetType === "garage"),
+    objectRental: rentals.some((r: any) => r.assetType === "object"),
+  };
+  const isResident = badges.apartment || badges.objectSale;
+  const activeBadges = BADGE_CONFIG.filter(b => badges[b.key]);
+
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/customers" className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Sakin Profili</h1>
-            <p className="text-muted-foreground mt-1">#{customer.id} - {customer.firstName} {customer.lastName}</p>
+    <TooltipProvider>
+      <AppLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center gap-4">
+            <Link href="/customers" className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-3xl font-display font-bold text-foreground">Sakin Profili</h1>
+              <p className="text-muted-foreground mt-1">#{customer.id} — {customer.firstName} {customer.lastName}</p>
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Profile card */}
-          <Card className="border-none shadow-lg shadow-black/5 md:col-span-1 h-fit">
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center text-center border-b border-border/50 pb-6 mb-6 relative">
-                {isAdmin && (
-                  <Button size="icon" variant="ghost"
-                    className="absolute top-0 right-0 h-8 w-8 text-muted-foreground hover:text-primary"
-                    onClick={openEdit}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                )}
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center text-white text-3xl font-bold mb-4 shadow-lg shadow-primary/20">
-                  {customer.firstName[0]}{customer.lastName[0]}
-                </div>
-                <h2 className="text-xl font-bold">{customer.firstName} {customer.lastName}</h2>
-                <p className="text-muted-foreground text-sm flex items-center justify-center gap-1 mt-1">
-                  <Phone className="w-3 h-3" /> {customer.phone}
-                </p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ── Left: Profile card ── */}
+            <div className="md:col-span-1 space-y-4">
+              <Card className="border-none shadow-lg shadow-black/5">
+                <CardContent className="p-6">
+                  {/* Avatar + name */}
+                  <div className="relative flex flex-col items-center text-center pb-5 mb-5 border-b border-border/50">
+                    {isAdmin && (
+                      <Button size="icon" variant="ghost"
+                        className="absolute top-0 right-0 h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={openEdit}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {/* Avatar */}
+                    <div className={`w-24 h-24 rounded-full bg-gradient-to-br ${isResident ? "from-blue-500 to-blue-400" : "from-amber-500 to-orange-400"} flex items-center justify-center text-white text-3xl font-bold mb-4 shadow-lg`}>
+                      {customer.firstName[0]}{customer.lastName[0]}
+                    </div>
+                    <h2 className="text-xl font-bold leading-tight">{customer.firstName} {customer.lastName}</h2>
+                    <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
+                      <Phone className="w-3 h-3" /> {customer.phone}
+                    </p>
+                    {/* Type badge */}
+                    <div className="mt-2">
+                      {isResident ? (
+                        <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700 font-semibold px-3">
+                          Sakin
+                        </Badge>
+                      ) : activeBadges.length > 0 ? (
+                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700 font-semibold px-3">
+                          İcarəçi
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-slate-200 text-muted-foreground px-3">
+                          Qeyd yoxdur
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                    <Hash className="w-4 h-4" />
+                  {/* Info rows */}
+                  <div className="space-y-3 mb-5">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <Hash className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">FIN Kod</p>
+                        <p className="font-mono font-medium">{customer.fin || '—'}</p>
+                      </div>
+                    </div>
+                    {customer.address && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                          <MapPin className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ünvan</p>
+                          <p className="font-medium">{customer.address}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">FIN Kod</p>
-                    <p className="font-medium">{customer.fin || '-'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Ünvan</p>
-                    <p className="font-medium">{customer.address || '-'}</p>
-                  </div>
-                </div>
 
-                {/* Summary stats */}
-                <div className="pt-2 border-t border-border/50 grid grid-cols-2 gap-3 mt-2">
-                  <div className="bg-muted/60 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-primary">{sales.length}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Satınalma</p>
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-3 border-t border-border/50 pt-4">
+                    <div className="bg-muted/60 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-primary">{sales.length}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Satınalma</p>
+                    </div>
+                    <div className="bg-muted/60 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-600">{rentals.length}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">İcarə</p>
+                    </div>
                   </div>
-                  <div className="bg-muted/60 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-blue-600">{rentals.length}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">İcarə</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Right column */}
-          <div className="md:col-span-2 space-y-6">
-            {/* Sales */}
-            <Card className="border-none shadow-lg shadow-black/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                  Satınalma Tarixçəsi
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {sales.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">Bu sakinin satınalması yoxdur.</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tarix</TableHead>
-                        <TableHead>Aktiv</TableHead>
-                        <TableHead>Ödəniş Kodu</TableHead>
-                        <TableHead>Növ</TableHead>
-                        <TableHead className="text-right">Ümumi</TableHead>
-                        <TableHead className="text-right">Ödənilib</TableHead>
-                        <TableHead className="text-right">Borc</TableHead>
-                        <TableHead className="w-[90px]">İrəliləyiş</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sales.map((sale: any) => (
-                        <TableRow key={sale.id}>
-                          <TableCell className="text-sm">{format(new Date(sale.saleDate), 'dd.MM.yyyy')}</TableCell>
-                          <TableCell className="font-medium">{sale.assetDescription}</TableCell>
-                          <TableCell>
-                            {sale.paymentCode ? (
-                              <div className="flex items-center gap-1.5">
-                                <Key className="w-3 h-3 text-muted-foreground shrink-0" />
-                                <span className="font-mono text-xs tracking-wider text-foreground select-all">
-                                  {sale.paymentCode}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell><StatusBadge status={sale.saleType} /></TableCell>
-                          <TableCell className="text-right font-bold">{formatCurrency(sale.totalAmount)}</TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-bold text-emerald-600">{formatCurrency(sale.paidAmount)}</span>
-                            {sale.saleType === 'credit' && sale.downPayment > 0 && (
-                              <div className="text-[11px] text-muted-foreground mt-0.5">
-                                İlkin: {formatCurrency(sale.downPayment)}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={`font-semibold ${sale.remainingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                              {formatCurrency(sale.remainingAmount)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <span className="text-xs text-muted-foreground">{sale.progressPercent ?? 0}%</span>
-                              <Progress value={sale.progressPercent ?? 0} className="h-1.5 bg-slate-100" />
+              {/* ── Status icon cards ── */}
+              {activeBadges.length > 0 && (
+                <Card className="border-none shadow-lg shadow-black/5">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Əlaqəli aktivlər</p>
+                    <div className="space-y-2">
+                      {activeBadges.map(b => {
+                        const Icon = b.icon;
+                        return (
+                          <div key={b.key}
+                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border ${b.bg} ${b.border}`}>
+                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${b.gradientFrom} ${b.gradientTo} flex items-center justify-center shadow-sm shrink-0`}>
+                              <Icon className="w-4 h-4 text-white" />
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+                            <span className={`text-sm font-medium ${b.color}`}>{b.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-            {/* Rentals */}
-            <Card className="border-none shadow-lg shadow-black/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Key className="w-5 h-5 text-blue-600" />
-                  İcarə Müqavilələri
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {rentals.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">Bu sakinin icarə müqaviləsi yoxdur.</div>
+            {/* ── Right: Collapsible sections ── */}
+            <div className="md:col-span-2 space-y-4">
+              {/* Satınalma Tarixçəsi — starts CLOSED */}
+              <CollapsibleSection
+                icon={ShoppingBag}
+                title="Satınalma Tarixçəsi"
+                count={sales.length}
+                iconColor="text-primary"
+                defaultOpen={false}
+              >
+                {sales.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm mt-4">Bu sakinin satınalması yoxdur.</div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Aktiv</TableHead>
-                        <TableHead>Başlanğıc</TableHead>
-                        <TableHead>Bitmə</TableHead>
-                        <TableHead className="text-right">Aylıq</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rentals.map((rental: any) => (
-                        <TableRow key={rental.id}>
-                          <TableCell className="font-medium">{rental.assetDescription}</TableCell>
-                          <TableCell className="text-sm">{format(new Date(rental.startDate), 'dd.MM.yyyy')}</TableCell>
-                          <TableCell className="text-sm">{format(new Date(rental.endDate), 'dd.MM.yyyy')}</TableCell>
-                          <TableCell className="text-right font-bold text-blue-700">{formatCurrency(rental.monthlyAmount)}</TableCell>
-                          <TableCell><RentalStatusBadge status={rental.status} /></TableCell>
+                  <div className="mt-4 overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tarix</TableHead>
+                          <TableHead>Aktiv</TableHead>
+                          <TableHead>Ödəniş Kodu</TableHead>
+                          <TableHead>Növ</TableHead>
+                          <TableHead className="text-right">Ümumi</TableHead>
+                          <TableHead className="text-right">Ödənilib</TableHead>
+                          <TableHead className="text-right">Borc</TableHead>
+                          <TableHead className="w-[90px]">İrəliləyiş</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {sales.map((sale: any) => (
+                          <TableRow key={sale.id}>
+                            <TableCell className="text-sm whitespace-nowrap">
+                              {format(new Date(sale.saleDate), 'dd.MM.yyyy')}
+                            </TableCell>
+                            <TableCell className="font-medium">{sale.assetDescription}</TableCell>
+                            <TableCell>
+                              {sale.paymentCode ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1.5 cursor-default">
+                                      <Key className="w-3 h-3 text-muted-foreground shrink-0" />
+                                      <span className="font-mono text-xs tracking-wider text-foreground select-all">
+                                        {sale.paymentCode}
+                                      </span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Ödəniş kodu</TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell><StatusBadge status={sale.saleType} /></TableCell>
+                            <TableCell className="text-right font-bold whitespace-nowrap">
+                              {formatCurrency(sale.totalAmount)}
+                            </TableCell>
+                            <TableCell className="text-right whitespace-nowrap">
+                              <span className="font-bold text-emerald-600">{formatCurrency(sale.paidAmount)}</span>
+                              {sale.saleType === 'credit' && sale.downPayment > 0 && (
+                                <div className="text-[11px] text-muted-foreground mt-0.5">
+                                  İlkin: {formatCurrency(sale.downPayment)}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right whitespace-nowrap">
+                              <span className={`font-semibold ${sale.remainingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(sale.remainingAmount)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <span className="text-xs text-muted-foreground">{sale.progressPercent ?? 0}%</span>
+                                <Progress value={sale.progressPercent ?? 0} className="h-1.5 bg-slate-100" />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+              </CollapsibleSection>
 
-      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
-        title="Sakini Redaktə et" onSave={handleSaveCustomer}>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Ad</label>
-              <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)}
-                className="rounded-xl h-11" />
+              {/* İcarə Müqavilələri — starts CLOSED */}
+              <CollapsibleSection
+                icon={CalendarDays}
+                title="İcarə Müqavilələri"
+                count={rentals.length}
+                iconColor="text-blue-600"
+                defaultOpen={false}
+              >
+                {rentals.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm mt-4">Bu sakinin icarə müqaviləsi yoxdur.</div>
+                ) : (
+                  <div className="mt-4 overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Aktiv</TableHead>
+                          <TableHead>Başlanğıc</TableHead>
+                          <TableHead>Bitmə</TableHead>
+                          <TableHead className="text-right">Aylıq</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rentals.map((rental: any) => {
+                          const cfg = rental.assetType === "garage"
+                            ? { icon: ParkingCircle, color: "text-indigo-600", bg: "bg-indigo-50" }
+                            : { icon: Store, color: "text-amber-600", bg: "bg-amber-50" };
+                          const RIcon = cfg.icon;
+                          return (
+                            <TableRow key={rental.id}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-7 h-7 rounded-lg ${cfg.bg} flex items-center justify-center shrink-0`}>
+                                    <RIcon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                                  </div>
+                                  <span className="font-medium text-sm">{rental.assetDescription}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                {format(new Date(rental.startDate), 'dd.MM.yyyy')}
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                {format(new Date(rental.endDate), 'dd.MM.yyyy')}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-blue-700 whitespace-nowrap">
+                                {formatCurrency(rental.monthlyAmount)}
+                              </TableCell>
+                              <TableCell><RentalStatusBadge status={rental.status} /></TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CollapsibleSection>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Soyad</label>
-              <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)}
-                className="rounded-xl h-11" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Telefon</label>
-              <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
-                className="rounded-xl h-11" placeholder="+994..." />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">FIN Kod</label>
-              <Input value={editFin} onChange={(e) => setEditFin(e.target.value)}
-                className="rounded-xl h-11" maxLength={7} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Ünvan</label>
-            <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)}
-              className="rounded-xl h-11" />
           </div>
         </div>
-      </AdminEditDialog>
-    </AppLayout>
+
+        {/* Edit dialog */}
+        <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
+          title="Sakini Redaktə et" onSave={handleSaveCustomer}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Ad</label>
+                <Input value={editFirstName} onChange={e => setEditFirstName(e.target.value)} className="rounded-xl h-11" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Soyad</label>
+                <Input value={editLastName} onChange={e => setEditLastName(e.target.value)} className="rounded-xl h-11" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Telefon</label>
+                <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} className="rounded-xl h-11" placeholder="+994..." />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">FIN Kod <span className="text-xs text-muted-foreground">(7 simvol)</span></label>
+                <Input value={editFin} onChange={e => setEditFin(e.target.value.toUpperCase())}
+                  className="rounded-xl h-11 font-mono" maxLength={7} placeholder="AX12345" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ünvan</label>
+              <Input value={editAddress} onChange={e => setEditAddress(e.target.value)} className="rounded-xl h-11" />
+            </div>
+          </div>
+        </AdminEditDialog>
+      </AppLayout>
+    </TooltipProvider>
   );
 }
