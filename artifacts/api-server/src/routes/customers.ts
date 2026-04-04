@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, buildingsTable, quartersTable, installmentsTable, rentalsTable, objectPaymentsTable } from "@workspace/db/schema";
-import { eq, or, ilike, inArray } from "drizzle-orm";
+import { eq, or, ilike, inArray, and } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
@@ -22,12 +22,50 @@ router.get("/", async (req, res) => {
     );
   }
 
-  res.json(await query.orderBy(customersTable.lastName, customersTable.firstName));
+  const customers = await query.orderBy(customersTable.lastName, customersTable.firstName);
+
+  if (customers.length === 0) return res.json([]);
+
+  const customerIds = customers.map(c => c.id);
+
+  // Bulk fetch sales and active rentals to build badge info
+  const [allSales, allRentals] = await Promise.all([
+    db.select({ customerId: salesTable.customerId, assetType: salesTable.assetType })
+      .from(salesTable)
+      .where(inArray(salesTable.customerId, customerIds)),
+    db.select({ customerId: rentalsTable.customerId, assetType: rentalsTable.assetType, status: rentalsTable.status })
+      .from(rentalsTable)
+      .where(inArray(rentalsTable.customerId, customerIds)),
+  ]);
+
+  const badgeMap: Record<number, { apartment?: boolean; garageSale?: boolean; garageRental?: boolean; objectSale?: boolean; objectRental?: boolean }> = {};
+  for (const s of allSales) {
+    if (!badgeMap[s.customerId]) badgeMap[s.customerId] = {};
+    if (s.assetType === "apartment") badgeMap[s.customerId].apartment = true;
+    if (s.assetType === "garage") badgeMap[s.customerId].garageSale = true;
+    if (s.assetType === "object") badgeMap[s.customerId].objectSale = true;
+  }
+  for (const r of allRentals) {
+    if (!badgeMap[r.customerId!]) badgeMap[r.customerId!] = {};
+    if (r.assetType === "garage") badgeMap[r.customerId!].garageRental = true;
+    if (r.assetType === "object") badgeMap[r.customerId!].objectRental = true;
+  }
+
+  res.json(customers.map(c => ({ ...c, badges: badgeMap[c.id] ?? {} })));
 });
+
+function finValidation(fin: string | null | undefined): string | null {
+  if (!fin) return null;
+  if (fin.length !== 7) return "FIN kodu dəqiq 7 simvol olmalıdır";
+  if (!/^[A-Za-z0-9]{7}$/.test(fin)) return "FIN kodunda yalnız hərf və rəqəm ola bilər";
+  return null;
+}
 
 // POST /customers — FIN-based deduplication: if same FIN exists, return existing customer
 router.post("/", async (req, res) => {
   const { firstName, lastName, fin, phone, address } = req.body;
+  const finErr = finValidation(fin);
+  if (finErr) return res.status(400).json({ error: finErr });
 
   if (fin?.trim()) {
     const [existing] = await db
@@ -190,6 +228,8 @@ router.put("/:id", async (req, res) => {
   if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
     return res.status(400).json({ error: "Ad, soyad və telefon tələb olunur" });
   }
+  const finErr = finValidation(fin);
+  if (finErr) return res.status(400).json({ error: finErr });
   const [updated] = await db
     .update(customersTable)
     .set({
