@@ -326,4 +326,11 @@ router.put("/blocks/:id/reconfigure", async (req, res) => {
   res.json({ blockId, floorCount: maxFloor, apartmentCount: updatedApts.length });
 });
 
+// POST /admin/verify — verifies admin password (used for cross-building garage authorization)
+router.post("/verify", async (req, res) => {
+  const { username, password } = req.body ?? {};
+  const ok = await verifyAdmin(username, password, res);
+  if (ok) res.json({ ok: true });
+});
+
 export default router;

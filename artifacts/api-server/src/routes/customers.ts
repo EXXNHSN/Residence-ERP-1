@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, installmentsTable, rentalsTable, objectPaymentsTable } from "@workspace/db/schema";
+import { customersTable, salesTable, apartmentsTable, objectsTable, blocksTable, buildingsTable, quartersTable, installmentsTable, rentalsTable, objectPaymentsTable } from "@workspace/db/schema";
 import { eq, or, ilike, inArray } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
@@ -43,6 +43,44 @@ router.post("/", async (req, res) => {
     .values({ firstName, lastName, fin: fin?.trim() || null, phone, address })
     .returning();
   res.status(201).json(customer);
+});
+
+// GET /customers/:id/building — returns the customer's apartment building info for smart garage assignment
+router.get("/:id/building", async (req, res) => {
+  const customerId = Number(req.params.id);
+  const sales = await db.select().from(salesTable)
+    .where(eq(salesTable.customerId, customerId));
+  const aptSale = sales.find(s => s.assetType === "apartment");
+  if (!aptSale) return res.json({ buildingId: null, buildingName: null, quarterId: null, quarterName: null, blockId: null, blockName: null, apartmentNumber: null });
+
+  const [row] = await db
+    .select({
+      apt: apartmentsTable,
+      blockId: blocksTable.id,
+      blockName: blocksTable.name,
+      buildingId: buildingsTable.id,
+      buildingName: buildingsTable.name,
+      quarterId: quartersTable.id,
+      quarterName: quartersTable.name,
+    })
+    .from(apartmentsTable)
+    .leftJoin(blocksTable, eq(apartmentsTable.blockId, blocksTable.id))
+    .leftJoin(buildingsTable, eq(blocksTable.buildingId, buildingsTable.id))
+    .leftJoin(quartersTable, eq(buildingsTable.quarterId, quartersTable.id))
+    .where(eq(apartmentsTable.id, aptSale.assetId))
+    .limit(1);
+
+  if (!row) return res.json({ buildingId: null, buildingName: null, quarterId: null, quarterName: null, blockId: null, blockName: null, apartmentNumber: null });
+
+  res.json({
+    buildingId: row.buildingId,
+    buildingName: row.buildingName,
+    quarterId: row.quarterId,
+    quarterName: row.quarterName,
+    blockId: row.blockId,
+    blockName: row.blockName,
+    apartmentNumber: row.apt.number,
+  });
 });
 
 // GET /customers/by-fin/:fin — lookup by FIN number
