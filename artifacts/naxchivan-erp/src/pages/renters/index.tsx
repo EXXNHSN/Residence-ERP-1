@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Search, Loader2, Phone, Store, CalendarDays, Banknote, Link as LinkIcon } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Search, Loader2, Phone, Store, CalendarDays, Banknote, UserCheck, UserX } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -41,11 +40,15 @@ export default function RentersPage() {
   const filtered = (renters ?? []).filter((r: any) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
+    const fullName = `${r.firstName} ${r.lastName}`.toLowerCase();
     return (
-      r.firstName?.toLowerCase().includes(q) ||
-      r.lastName?.toLowerCase().includes(q) ||
+      fullName.includes(q) ||
       r.phone?.toLowerCase().includes(q) ||
-      r.fin?.toLowerCase().includes(q)
+      r.fin?.toLowerCase().includes(q) ||
+      r.rentals?.some((rent: any) =>
+        rent.objectNumber?.toLowerCase().includes(q) ||
+        rent.contractNumber?.toLowerCase().includes(q)
+      )
     );
   });
 
@@ -54,10 +57,12 @@ export default function RentersPage() {
   ).length;
 
   const totalMonthly = (renters ?? []).reduce((sum: number, r: any) => {
-    return sum + r.rentals
+    return sum + (r.rentals ?? [])
       .filter((rent: any) => rent.status === "active")
       .reduce((s: number, rent: any) => s + Number(rent.monthlyAmount), 0);
   }, 0);
+
+  const linkedCount = (renters ?? []).filter((r: any) => r.isCustomer).length;
 
   return (
     <TooltipProvider>
@@ -71,14 +76,14 @@ export default function RentersPage() {
             </div>
             <div className="relative w-full md:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Ad, FIN, telefon axtar..."
+              <Input placeholder="Ad, FIN, telefon, obyekt axtar..."
                 value={search} onChange={e => setSearch(e.target.value)}
                 className="pl-9 rounded-xl bg-card border-none shadow-sm" />
             </div>
           </div>
 
           {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-card rounded-2xl border border-border/50 p-5 shadow-sm">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Cəmi Arendator</p>
               <p className="text-3xl font-bold text-foreground mt-1">{renters?.length ?? 0}</p>
@@ -86,6 +91,10 @@ export default function RentersPage() {
             <div className="bg-card rounded-2xl border border-border/50 p-5 shadow-sm">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Aktiv İcarəçi</p>
               <p className="text-3xl font-bold text-emerald-600 mt-1">{activeCount}</p>
+            </div>
+            <div className="bg-card rounded-2xl border border-border/50 p-5 shadow-sm">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Sakin Profili Var</p>
+              <p className="text-3xl font-bold text-blue-600 mt-1">{linkedCount}</p>
             </div>
             <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5 shadow-sm">
               <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Aylıq Gəlir (aktiv)</p>
@@ -98,6 +107,10 @@ export default function RentersPage() {
             {isLoading ? (
               <div className="p-12 flex justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                {search ? "Axtarışa uyğun arendator tapılmadı" : "Hələ qeyri yaşayış icarəsi yoxdur"}
               </div>
             ) : (
               <Table>
@@ -114,82 +127,97 @@ export default function RentersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                        Arendator tapılmadı
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filtered.flatMap((renter: any) =>
-                      renter.rentals.map((rental: any, ri: number) => (
-                        <TableRow key={`${renter.id}-${rental.id}`} className="hover:bg-muted/30 transition-colors">
-                          {ri === 0 && (
-                            <TableCell rowSpan={renter.rentals.length}>
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center font-bold text-amber-700 text-sm shrink-0">
-                                  {renter.firstName[0]}{renter.lastName[0]}
+                  {filtered.flatMap((renter: any) =>
+                    (renter.rentals ?? []).map((rental: any, ri: number) => (
+                      <TableRow key={`${renter.id}-${rental.id}`} className="hover:bg-muted/30 transition-colors">
+                        {ri === 0 && (
+                          <TableCell rowSpan={renter.rentals.length}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${renter.isCustomer ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                                {renter.firstName?.[0] ?? "?"}{renter.lastName?.[0] ?? ""}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                                  {renter.firstName} {renter.lastName}
+                                  {renter.isCustomer ? (
+                                    <UserCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                  ) : (
+                                    <UserX className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                  )}
                                 </div>
-                                <div>
-                                  <div className="font-semibold text-foreground text-sm">
-                                    {renter.firstName} {renter.lastName}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">#{renter.id}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {renter.isCustomer ? `Sakin #${renter.id}` : "Xarici icarəçi"}
                                 </div>
                               </div>
-                            </TableCell>
-                          )}
-                          {ri === 0 && (
-                            <TableCell rowSpan={renter.rentals.length}>
-                              {renter.fin
-                                ? <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-lg">{renter.fin}</span>
-                                : <span className="text-muted-foreground">—</span>}
-                            </TableCell>
-                          )}
-                          {ri === 0 && (
-                            <TableCell rowSpan={renter.rentals.length}>
+                            </div>
+                          </TableCell>
+                        )}
+                        {ri === 0 && (
+                          <TableCell rowSpan={renter.rentals.length}>
+                            {renter.fin
+                              ? <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-lg">{renter.fin}</span>
+                              : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                        )}
+                        {ri === 0 && (
+                          <TableCell rowSpan={renter.rentals.length}>
+                            {renter.phone ? (
                               <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                                 <Phone className="w-3.5 h-3.5 shrink-0" /> {renter.phone}
                               </div>
-                            </TableCell>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-md bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                              <Store className="w-3.5 h-3.5 text-amber-600" />
+                            </div>
+                            <span className="text-sm font-medium">
+                              {rental.objectType === "garage"
+                                ? `Avto Dayanacaq ${rental.objectNumber ?? rental.assetId}`
+                                : rental.objectNumber
+                                  ? `Qeyri Yaşayış №${rental.objectNumber}`
+                                  : `Qeyri Yaşayış #${rental.assetId}`}
+                            </span>
+                          </div>
+                          {rental.contractNumber && (
+                            <div className="text-xs text-muted-foreground mt-0.5 ml-8">
+                              Müq: {rental.contractNumber}
+                            </div>
                           )}
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-md bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
-                                <Store className="w-3.5 h-3.5 text-amber-600" />
-                              </div>
-                              <span className="text-sm font-medium">
-                                {rental.objectType === "garage"
-                                  ? `Avto Dayanacaq ${rental.objectNumber ?? rental.assetId}`
-                                  : `Qeyri Yaşayış ${rental.objectNumber ?? rental.assetId}`}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                              {format(new Date(rental.startDate), 'dd.MM.yy')} — {format(new Date(rental.endDate), 'dd.MM.yy')}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1 text-amber-700 font-bold text-sm">
-                              <Banknote className="w-3.5 h-3.5" />
-                              {formatCurrency(rental.monthlyAmount)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <RentalStatusBadge status={rental.status} />
-                          </TableCell>
-                          {ri === 0 && (
-                            <TableCell rowSpan={renter.rentals.length} className="text-right">
-                              <Link href={`/customers/${renter.id}`} className="text-primary hover:underline text-sm font-medium">
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                            {format(new Date(rental.startDate), 'dd.MM.yy')} — {format(new Date(rental.endDate), 'dd.MM.yy')}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1 text-amber-700 font-bold text-sm">
+                            <Banknote className="w-3.5 h-3.5" />
+                            {formatCurrency(rental.monthlyAmount)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <RentalStatusBadge status={rental.status} />
+                        </TableCell>
+                        {ri === 0 && (
+                          <TableCell rowSpan={renter.rentals.length} className="text-right">
+                            {renter.isCustomer ? (
+                              <Link href={`/customers/${renter.id}`}
+                                className="text-primary hover:underline text-sm font-medium">
                                 Profil
                               </Link>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))
-                    )
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
