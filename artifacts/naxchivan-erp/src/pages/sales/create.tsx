@@ -21,6 +21,8 @@ import { useLocation } from "wouter";
 import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, Layers, SquareStack, X, SlidersHorizontal, Zap } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 function toRoman(num: number): string {
   const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
@@ -50,17 +52,16 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
 
 export default function CreateSalePage() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const { data: apartments } = useListApartments({ status: ApartmentStatus.available });
   const { data: objects } = useListObjects({ status: ObjectStatus.available });
   const { data: tariffs } = useListTariffs();
   const { data: blocks } = useListBlocks();
 
   const { mutateAsync: createCustomer } = useCreateCustomer();
-  const { mutate: createSale, isPending } = useCreateSale({
-    mutation: {
-      onSuccess: () => setLocation("/sales")
-    }
-  });
+  const { mutateAsync: createSale, isPending } = useCreateSale();
 
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -215,8 +216,9 @@ export default function CreateSalePage() {
           address: data.address || undefined,
         }
       });
+
       const isGarage = data.assetType === 'garage';
-      createSale({
+      await createSale({
         data: {
           customerId: customer.id,
           assetType: data.assetType,
@@ -228,8 +230,22 @@ export default function CreateSalePage() {
           ...(isGarage ? { totalAmountOverride: calcResult.total } : {}),
         } as any
       });
-    } catch {
+
+      // Invalidate all affected caches so lists show fresh data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/sales"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/customers"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/apartments"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/objects"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/stats/summary"] }),
+      ]);
+
+      toast({ title: "Satış uğurla yaradıldı", description: `${data.firstName} ${data.lastName} üçün satış qeydə alındı.` });
+      setLocation("/sales");
+    } catch (err: any) {
       setIsSubmitting(false);
+      const msg = (err?.data as any)?.error ?? err?.message ?? "Bilinməyən xəta baş verdi";
+      toast({ title: "Satış yaradılmadı", description: msg, variant: "destructive" });
     }
   };
 
