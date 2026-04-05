@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { objectsTable, tariffsTable, blocksTable, quartersTable, buildingsTable } from "@workspace/db/schema";
+import { objectsTable, tariffsTable, blocksTable, quartersTable, buildingsTable, rentalsTable, customersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
@@ -84,7 +84,45 @@ async function enrichObject(obj: typeof objectsTable.$inferSelect, garageFixedPr
     buildingName,
     quarterId,
     buildingId,
+    // rental info filled in separately
+    rentalId: null as number | null,
+    tenantName: null as string | null,
+    tenantPhone: null as string | null,
+    rentalStart: null as string | null,
+    rentalEnd: null as string | null,
+    monthlyAmount: null as number | null,
+    customerId: null as number | null,
   };
+}
+
+async function attachRentalInfo(objects: Awaited<ReturnType<typeof enrichObject>>[]) {
+  const rentedObjs = objects.filter(o => o.status === "rented" && o.type === "object");
+  if (rentedObjs.length === 0) return objects;
+
+  for (const obj of rentedObjs) {
+    const [rental] = await db
+      .select()
+      .from(rentalsTable)
+      .where(and(eq(rentalsTable.assetId, obj.id), eq(rentalsTable.status, "active")))
+      .orderBy(rentalsTable.startDate)
+      .limit(1);
+
+    if (rental) {
+      let tName = rental.tenantName ?? null;
+      if (!tName && rental.customerId) {
+        const [cust] = await db.select().from(customersTable).where(eq(customersTable.id, rental.customerId)).limit(1);
+        if (cust) tName = `${cust.firstName} ${cust.lastName}`;
+      }
+      obj.rentalId = rental.id;
+      obj.tenantName = tName;
+      obj.tenantPhone = rental.tenantPhone ?? null;
+      obj.rentalStart = rental.startDate.toISOString();
+      obj.rentalEnd = rental.endDate.toISOString();
+      obj.monthlyAmount = Number(rental.monthlyAmount);
+      obj.customerId = rental.customerId ?? null;
+    }
+  }
+  return objects;
 }
 
 router.get("/", async (req, res) => {
@@ -106,7 +144,8 @@ router.get("/", async (req, res) => {
   const results = await Promise.all(
     objs.map(async (obj) => enrichObject(obj, garageFixedPrices, obj.type === "garage" ? 0 : objectPricePerSqm))
   );
-  res.json(results);
+  const enrichedWithRentals = await attachRentalInfo(results);
+  res.json(enrichedWithRentals);
 });
 
 // Bulk garage setup for a block
@@ -141,6 +180,39 @@ router.post("/garage-setup", async (req, res) => {
   const garageFixedPrices = await getGarageFixedPrices();
   const enriched = await Promise.all(inserted.map(o => enrichObject(o, garageFixedPrices, 0)));
   res.status(201).json({ count: enriched.length, garages: enriched });
+});
+
+// Bulk non-residential object creation for a block
+router.post("/object-setup", async (req, res) => {
+  const { blockId, count, area, startNumber, prefix } = req.body;
+  if (!blockId || !count) {
+    res.status(400).json({ error: "blockId və count tələb olunur" });
+    return;
+  }
+  const [block] = await db.select().from(blocksTable).where(eq(blocksTable.id, Number(blockId))).limit(1);
+  if (!block) { res.status(404).json({ error: "Blok tapılmadı" }); return; }
+
+  const numCount = Number(count);
+  const numArea = area ? Number(area) : 0;
+  const startN = startNumber ? Number(startNumber) : 1;
+  const pfx = prefix ?? "";
+
+  const items: typeof objectsTable.$inferInsert[] = [];
+  for (let i = 0; i < numCount; i++) {
+    items.push({
+      type: "object",
+      number: `${pfx}${startN + i}`,
+      area: String(numArea),
+      blockId: Number(blockId),
+      status: "available",
+    });
+  }
+
+  const inserted = await db.insert(objectsTable).values(items).returning();
+  const objectPricePerSqm = await getPricePerSqm("object");
+  const garageFixedPrices = await getGarageFixedPrices();
+  const enriched = await Promise.all(inserted.map(o => enrichObject(o, garageFixedPrices, objectPricePerSqm)));
+  res.status(201).json({ count: enriched.length, objects: enriched });
 });
 
 router.post("/", async (req, res) => {

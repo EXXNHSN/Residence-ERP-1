@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useListObjects, useListBlocks, useListTariffs, ObjectType } from "@workspace/api-client-react";
+import { useListObjects, useListBlocks, useListTariffs, useListCustomers, ObjectType } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Loader2, Store, MapPin, Building2, Search, Pencil, Trash2, MoreVertical } from "lucide-react";
+import { Plus, Loader2, Store, MapPin, Building2, Search, Pencil, Trash2, MoreVertical, KeyRound, User, Phone, Calendar, Banknote, ArrowUpRight, LayoutGrid, ChevronDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListObjectsQueryKey, useCreateObject } from "@workspace/api-client-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -16,15 +18,20 @@ import { formatArea, formatCurrency } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "wouter";
+import { format } from "date-fns";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function ObjectsPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editObj, setEditObj] = useState<any | null>(null);
   const [deleteObj, setDeleteObj] = useState<any | null>(null);
+  const [rentObj, setRentObj] = useState<any | null>(null);
+  const [rentLoading, setRentLoading] = useState(false);
 
   const { isAdmin } = useAuth();
   const { toast } = useToast();
@@ -33,66 +40,102 @@ export default function ObjectsPage() {
   const { data: allObjects, isLoading } = useListObjects({ type: ObjectType.object });
   const { data: blocks } = useListBlocks();
   const { data: tariffs } = useListTariffs();
+  const { data: customers } = useListCustomers();
 
   const { mutate: createObj, isPending } = useCreateObject({
     mutation: {
       onSuccess: () => {
-        setIsOpen(false);
+        setIsAddOpen(false);
         reset();
         queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
-        toast({ title: "Qeyri yaşayış əlavə edildi" });
+        toast({ title: "Qeyri yaşayış sahəsi əlavə edildi" });
       }
     }
   });
 
+  // Single add form
   const { register, handleSubmit, control, reset } = useForm({
     defaultValues: { number: "", area: "", blockId: "", activityType: "" }
   });
 
-  const { register: editReg, handleSubmit: editSubmit, control: editCtrl, reset: editReset, setValue: editSetVal } = useForm({
+  // Bulk creation form
+  const { register: bulkReg, handleSubmit: bulkSubmit, control: bulkCtrl, reset: bulkReset, watch: bulkWatch } = useForm({
+    defaultValues: { blockId: "", count: "5", area: "", startNumber: "1", prefix: "" }
+  });
+
+  // Edit form
+  const { register: editReg, handleSubmit: editSubmit, control: editCtrl, setValue: editSetVal } = useForm({
     defaultValues: { number: "", area: "", blockId: "", activityType: "" }
   });
 
-  const onSubmit = (data: any) => {
-    createObj({ data: { type: ObjectType.object, number: data.number, area: Number(data.area), blockId: data.blockId ? Number(data.blockId) : undefined, activityType: data.activityType || undefined } as any });
+  // Rent form
+  const { register: rentReg, handleSubmit: rentSubmit, control: rentCtrl, reset: rentReset } = useForm({
+    defaultValues: {
+      tenantName: "", tenantPhone: "", tenantFin: "", contractNumber: "",
+      customerId: "", startDate: "", endDate: "", monthlyAmount: ""
+    }
+  });
+
+  const onAdd = (data: any) => {
+    createObj({
+      data: {
+        type: ObjectType.object,
+        number: data.number,
+        area: Number(data.area),
+        blockId: data.blockId ? Number(data.blockId) : undefined,
+        activityType: data.activityType || undefined
+      } as any
+    });
   };
+
+  async function onBulkCreate(data: any) {
+    if (!data.blockId) { toast({ title: "Blok seçin", variant: "destructive" }); return; }
+    try {
+      const res = await fetch(`${BASE()}/api/objects/object-setup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blockId: Number(data.blockId),
+          count: Number(data.count),
+          area: data.area ? Number(data.area) : 0,
+          startNumber: Number(data.startNumber),
+          prefix: data.prefix || "",
+        }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+      const r = await res.json();
+      queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
+      toast({ title: `${r.count} obyekt yaradıldı` });
+      setIsBulkOpen(false);
+      bulkReset();
+    } catch (e: any) {
+      toast({ title: "Xəta", description: e.message, variant: "destructive" });
+    }
+  }
 
   function openEdit(obj: any) {
     editSetVal("number", obj.number ?? "");
-    editSetVal("area", obj.area ?? "");
+    editSetVal("area", String(obj.area ?? ""));
     editSetVal("blockId", obj.blockId?.toString() ?? "");
     editSetVal("activityType", obj.activityType ?? "");
     setEditObj(obj);
   }
 
-  const filtered = useMemo(() => {
-    if (!allObjects) return [];
-    return allObjects.filter((o: any) => {
-      if (filterStatus !== "all" && o.status !== filterStatus) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const match = o.number?.toLowerCase().includes(q) ||
-          o.activityType?.toLowerCase().includes(q) ||
-          o.blockName?.toLowerCase().includes(q) ||
-          o.quarterName?.toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      return true;
-    });
-  }, [allObjects, filterStatus, search]);
-
-  const stats = useMemo(() => ({
-    total: allObjects?.length ?? 0,
-    available: allObjects?.filter((o: any) => o.status === "available").length ?? 0,
-    sold: allObjects?.filter((o: any) => o.status === "sold").length ?? 0,
-    rented: allObjects?.filter((o: any) => o.status === "rented").length ?? 0,
-  }), [allObjects]);
+  function openRent(obj: any) {
+    rentReset();
+    setRentObj(obj);
+  }
 
   async function handleEdit(adminPassword: string, data: any) {
     const res = await fetch(`${BASE()}/api/objects/${editObj.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "admin", password: adminPassword, ...data, area: Number(data.area), blockId: (data.blockId && data.blockId !== "none") ? Number(data.blockId) : null }),
+      body: JSON.stringify({
+        username: "admin", password: adminPassword,
+        ...data,
+        area: Number(data.area),
+        blockId: (data.blockId && data.blockId !== "none") ? Number(data.blockId) : null
+      }),
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Xəta"); }
     queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
@@ -108,9 +151,70 @@ export default function ObjectsPage() {
     });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? "Silmə xətası"); }
     queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
-    toast({ title: `"${deleteObj.number}" silindi`, variant: "default" });
+    toast({ title: `"${deleteObj.number}" silindi` });
     setDeleteObj(null);
   }
+
+  async function handleRent(data: any) {
+    if (!rentObj) return;
+    setRentLoading(true);
+    try {
+      const res = await fetch(`${BASE()}/api/rentals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assetType: "object",
+          assetId: rentObj.id,
+          tenantName: data.tenantName || null,
+          tenantPhone: data.tenantPhone || null,
+          tenantFin: data.tenantFin || null,
+          contractNumber: data.contractNumber || null,
+          customerId: (data.customerId && data.customerId !== "none") ? Number(data.customerId) : null,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          monthlyAmount: Number(data.monthlyAmount),
+        }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Xəta"); }
+      queryClient.invalidateQueries({ queryKey: getListObjectsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      toast({ title: `"${rentObj.number}" icarəyə verildi` });
+      setRentObj(null);
+    } catch (e: any) {
+      toast({ title: "Xəta", description: e.message, variant: "destructive" });
+    } finally {
+      setRentLoading(false);
+    }
+  }
+
+  const filtered = useMemo(() => {
+    if (!allObjects) return [];
+    return allObjects.filter((o: any) => {
+      if (filterStatus !== "all" && o.status !== filterStatus) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const match =
+          o.number?.toLowerCase().includes(q) ||
+          o.activityType?.toLowerCase().includes(q) ||
+          o.blockName?.toLowerCase().includes(q) ||
+          o.quarterName?.toLowerCase().includes(q) ||
+          o.tenantName?.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [allObjects, filterStatus, search]);
+
+  const stats = useMemo(() => ({
+    total: allObjects?.length ?? 0,
+    available: allObjects?.filter((o: any) => o.status === "available").length ?? 0,
+    sold: allObjects?.filter((o: any) => o.status === "sold").length ?? 0,
+    rented: allObjects?.filter((o: any) => o.status === "rented").length ?? 0,
+  }), [allObjects]);
+
+  const bulkCount = Number(bulkWatch("count")) || 0;
+  const bulkPrefix = bulkWatch("prefix") || "";
+  const bulkStart = Number(bulkWatch("startNumber")) || 1;
 
   return (
     <AppLayout>
@@ -122,87 +226,94 @@ export default function ObjectsPage() {
             <h1 className="text-3xl font-display font-bold text-foreground">Qeyri Yaşayış</h1>
             <p className="text-muted-foreground mt-1">Kommersiya, ofis və digər qeyri yaşayış sahələri</p>
           </div>
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 flex-shrink-0">
-                <Plus className="w-4 h-4 mr-1.5" /> Yeni Əlavə et
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-display flex items-center gap-2">
-                  <Store className="w-5 h-5 text-primary" /> Yeni Qeyri Yaşayış
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nömrə / Ad</label>
-                  <Input {...register("number", { required: true })} className="rounded-xl h-11" placeholder="Məs: Mağaza 1A, Ofis 201..." />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Sahə (m²)</label>
-                  <Input type="number" step="0.01" {...register("area", { required: true })} className="rounded-xl h-11" placeholder="Məs: 120" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Yerləşdiyi Blok</label>
-                  <Controller name="blockId" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
-                      <SelectContent>
-                        {blocks?.map(b => (
-                          <SelectItem key={b.id} value={b.id.toString()}>
-                            {b.name} {b.quarterName ? `(${b.quarterName})` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Fəaliyyət Sahəsi</label>
-                  <Input {...register("activityType")} className="rounded-xl h-11" placeholder="Məs: Ərzaq mağazası, Apteka, Ofis..." />
-                </div>
-                <Button type="submit" disabled={isPending} className="w-full h-12 rounded-xl">
-                  {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Əlavə et"}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Bulk creation button */}
+            <Button variant="outline" className="rounded-xl border-dashed gap-2"
+              onClick={() => setIsBulkOpen(true)}>
+              <LayoutGrid className="w-4 h-4" /> Toplu Yarat
+            </Button>
+            {/* Single add button */}
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
+                  <Plus className="w-4 h-4 mr-1.5" /> Tək Əlavə et
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-display flex items-center gap-2">
+                    <Store className="w-5 h-5 text-primary" /> Yeni Qeyri Yaşayış Sahəsi
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(onAdd)} className="space-y-4 mt-2">
+                  <div className="space-y-2">
+                    <Label>Nömrə / Ad</Label>
+                    <Input {...register("number", { required: true })} className="rounded-xl h-11" placeholder="Məs: 1A, Mağaza-1..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sahə (m²)</Label>
+                    <Input type="number" step="0.01" {...register("area")} className="rounded-xl h-11" placeholder="Məs: 80" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Yerləşdiyi Blok</Label>
+                    <Controller name="blockId" control={control} render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
+                        <SelectContent>
+                          {blocks?.map(b => (
+                            <SelectItem key={b.id} value={b.id.toString()}>
+                              {b.quarterName ? `${b.quarterName} / ` : ""}{b.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fəaliyyət Sahəsi</Label>
+                    <Input {...register("activityType")} className="rounded-xl h-11" placeholder="Məs: Ərzaq, Apteka, Ofis..." />
+                  </div>
+                  <Button type="submit" disabled={isPending} className="w-full h-12 rounded-xl">
+                    {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Əlavə et"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="flex flex-wrap gap-2 items-center">
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Cəmi", value: stats.total, active: filterStatus === "all", onClick: () => setFilterStatus("all"), activeBg: "bg-foreground text-white" },
-            { label: "Boş", value: stats.available, active: filterStatus === "available", onClick: () => setFilterStatus("available"), activeBg: "bg-emerald-600 text-white", idleColor: "text-emerald-700" },
-            { label: "Satılıb", value: stats.sold, active: filterStatus === "sold", onClick: () => setFilterStatus("sold"), activeBg: "bg-rose-600 text-white", idleColor: "text-rose-600" },
-            { label: "İcarədə", value: stats.rented, active: filterStatus === "rented", onClick: () => setFilterStatus("rented"), activeBg: "bg-indigo-600 text-white", idleColor: "text-indigo-600" },
+            { label: "Cəmi Obyekt", value: stats.total, color: "bg-card border-border/50", textColor: "text-foreground", status: "all" },
+            { label: "Boş (Satışa hazır)", value: stats.available, color: "bg-emerald-50 border-emerald-200", textColor: "text-emerald-700", status: "available" },
+            { label: "İcarədə", value: stats.rented, color: "bg-indigo-50 border-indigo-200", textColor: "text-indigo-700", status: "rented" },
+            { label: "Satılmış", value: stats.sold, color: "bg-rose-50 border-rose-200", textColor: "text-rose-700", status: "sold" },
           ].map(s => (
-            <button key={s.label} onClick={s.onClick}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium border transition-all ${
-                s.active ? `${s.activeBg} border-transparent shadow-sm` : `bg-white border-border/60 ${(s as any).idleColor ?? "text-foreground"} hover:bg-muted/40`
-              }`}>
-              <span>{s.label}</span>
-              <span className={`rounded-lg px-1.5 py-0.5 text-xs font-bold ${s.active ? "bg-white/20" : "bg-muted"}`}>{s.value}</span>
+            <button key={s.label} onClick={() => setFilterStatus(s.status)}
+              className={`${s.color} rounded-2xl border p-5 shadow-sm text-left transition-all hover:shadow-md ${filterStatus === s.status ? "ring-2 ring-primary ring-offset-1" : ""}`}>
+              <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
+              <p className={`text-3xl font-bold mt-1 ${s.textColor}`}>{s.value}</p>
             </button>
           ))}
+        </div>
+
+        {/* Search */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Ad, fəaliyyət, blok, icarəçi..." className="pl-9 rounded-xl h-10 bg-card border-border/60" />
+          </div>
           {tariffs && (
-            <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground self-center">
-              <span>1 m² =</span>
-              <span className="font-semibold text-foreground">{formatCurrency(tariffs.objectPricePerSqm)}</span>
+            <div className="text-xs text-muted-foreground hidden sm:block">
+              1 m² = <span className="font-semibold text-foreground">{formatCurrency(tariffs.objectPricePerSqm)}</span>
             </div>
           )}
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Ad, fəaliyyət, blok axtarın..." className="pl-9 rounded-xl h-10 bg-white border-border/60" />
-        </div>
-
         {/* Table */}
-        <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border/50 shadow-lg shadow-black/5 overflow-hidden">
           {isLoading ? (
             <div className="p-16 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
           ) : filtered.length === 0 ? (
@@ -211,30 +322,41 @@ export default function ObjectsPage() {
                 <Store className="w-8 h-8 text-muted-foreground/40" />
               </div>
               <p className="font-medium text-foreground">Nəticə tapılmadı</p>
-              <p className="text-sm text-muted-foreground mt-1">Filteri dəyişdirin və ya yeni qeyri yaşayış əlavə edin</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {filterStatus !== "all"
+                  ? <button onClick={() => setFilterStatus("all")} className="text-primary hover:underline">Bütün obyektlərə bax</button>
+                  : "Yeni qeyri yaşayış sahəsi əlavə edin"}
+              </p>
             </div>
           ) : (
             <Table>
               <TableHeader className="bg-muted/40">
                 <TableRow className="hover:bg-transparent border-b border-border/50">
-                  <TableHead className="w-12 text-xs font-semibold text-muted-foreground pl-5">#</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground">Ad / Nömrə</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground pl-5">Ad / Nömrə</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground">Fəaliyyət</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground">Blok / Kvartal</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground">Sahə</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground">Qiymət</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground">Status</TableHead>
-                  {isAdmin && <TableHead className="w-10" />}
+                  <TableHead className="text-xs font-semibold text-muted-foreground">Status / İcarəçi</TableHead>
+                  <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((obj: any) => (
-                  <TableRow key={obj.id} className="hover:bg-muted/20 transition-colors border-b border-border/30 last:border-0">
-                    <TableCell className="pl-5 text-xs text-muted-foreground font-mono">{obj.id}</TableCell>
-                    <TableCell>
+                  <TableRow key={obj.id}
+                    className={`hover:bg-muted/20 transition-colors border-b border-border/30 last:border-0 ${obj.status === "rented" ? "bg-indigo-50/30" : ""}`}>
+                    <TableCell className="pl-5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <Store className="w-4 h-4 text-primary" />
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          obj.status === "rented" ? "bg-indigo-100" :
+                          obj.status === "sold" ? "bg-rose-100" :
+                          "bg-primary/10"
+                        }`}>
+                          <Store className={`w-4 h-4 ${
+                            obj.status === "rented" ? "text-indigo-600" :
+                            obj.status === "sold" ? "text-rose-600" :
+                            "text-primary"
+                          }`} />
                         </div>
                         <span className="font-semibold text-sm text-foreground">{obj.number}</span>
                       </div>
@@ -265,27 +387,63 @@ export default function ObjectsPage() {
                       <span className="text-sm font-semibold text-primary">{formatCurrency(obj.salePrice)}</span>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={obj.status} />
+                      <div className="space-y-1">
+                        <StatusBadge status={obj.status} />
+                        {obj.status === "rented" && obj.tenantName && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1 text-xs font-medium text-indigo-700">
+                              <User className="w-3 h-3" /> {obj.tenantName}
+                            </div>
+                            {obj.monthlyAmount && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Banknote className="w-3 h-3" /> {formatCurrency(obj.monthlyAmount)}/ay
+                              </div>
+                            )}
+                            {obj.rentalEnd && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calendar className="w-3 h-3" /> {format(new Date(obj.rentalEnd), "dd.MM.yyyy")}-ə qədər
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg opacity-50 hover:opacity-100">
-                              <MoreVertical className="w-4 h-4" />
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {obj.status === "available" && (
+                          <Button size="sm" variant="outline"
+                            className="h-7 px-2.5 text-xs rounded-lg border-indigo-200 text-indigo-700 hover:bg-indigo-50 gap-1"
+                            onClick={() => openRent(obj)}>
+                            <KeyRound className="w-3 h-3" /> İcarə
+                          </Button>
+                        )}
+                        {obj.status === "rented" && (
+                          <Link href="/renters">
+                            <Button size="sm" variant="ghost"
+                              className="h-7 px-2 text-xs rounded-lg text-indigo-600 hover:bg-indigo-50 gap-1">
+                              <ArrowUpRight className="w-3 h-3" /> Arendator
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="rounded-xl">
-                            <DropdownMenuItem onClick={() => openEdit(obj)} className="gap-2 cursor-pointer">
-                              <Pencil className="w-4 h-4 text-primary" /> Redaktə et
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDeleteObj(obj)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
-                              <Trash2 className="w-4 h-4" /> Sil
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-50 hover:opacity-100">
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="rounded-xl">
+                              <DropdownMenuItem onClick={() => openEdit(obj)} className="gap-2 cursor-pointer">
+                                <Pencil className="w-4 h-4 text-primary" /> Redaktə et
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDeleteObj(obj)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+                                <Trash2 className="w-4 h-4" /> Sil
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -304,27 +462,166 @@ export default function ObjectsPage() {
         </div>
       </div>
 
+      {/* ── Bulk Creation Dialog ── */}
+      <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
+        <DialogContent className="sm:max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display flex items-center gap-2">
+              <LayoutGrid className="w-5 h-5 text-primary" /> Toplu Qeyri Yaşayış Sahəsi Yarat
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">Bir blok üçün birdəfəyə çoxlu obyekt yaratmaq üçün istifadə edin</p>
+          </DialogHeader>
+          <form onSubmit={bulkSubmit(onBulkCreate)} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label>Yerləşdiyi Blok *</Label>
+              <Controller name="blockId" control={bulkCtrl} render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
+                  <SelectContent>
+                    {blocks?.map(b => (
+                      <SelectItem key={b.id} value={b.id.toString()}>
+                        {b.quarterName ? `${b.quarterName} / ` : ""}{b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Obyekt sayı *</Label>
+                <Input type="number" min="1" max="50" {...bulkReg("count", { required: true })} className="rounded-xl h-11" />
+              </div>
+              <div className="space-y-2">
+                <Label>Sahə (m²)</Label>
+                <Input type="number" step="0.01" placeholder="0" {...bulkReg("area")} className="rounded-xl h-11" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Nömrə prefiksi</Label>
+                <Input {...bulkReg("prefix")} className="rounded-xl h-11" placeholder="Məs: Mağaza-" />
+              </div>
+              <div className="space-y-2">
+                <Label>Başlanğıc nömrə</Label>
+                <Input type="number" min="1" {...bulkReg("startNumber")} className="rounded-xl h-11" />
+              </div>
+            </div>
+            {bulkCount > 0 && (
+              <div className="rounded-xl bg-muted/50 border border-border/50 p-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">Nümunə nömrələr:</p>
+                <p className="font-mono text-xs">
+                  {Array.from({ length: Math.min(bulkCount, 5) }, (_, i) => `${bulkPrefix}${bulkStart + i}`).join(", ")}
+                  {bulkCount > 5 ? ` ... ${bulkPrefix}${bulkStart + bulkCount - 1}` : ""}
+                </p>
+              </div>
+            )}
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1 rounded-xl" onClick={() => setIsBulkOpen(false)}>Ləğv et</Button>
+              <Button type="submit" className="flex-1 rounded-xl">
+                {bulkCount} Obyekt Yarat
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Rent Dialog ── */}
+      <Dialog open={!!rentObj} onOpenChange={v => !v && setRentObj(null)}>
+        <DialogContent className="sm:max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-indigo-600" />
+              İcarəyə Ver: <span className="text-indigo-600">{rentObj?.number}</span>
+            </DialogTitle>
+            {rentObj && (
+              <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
+                <Building2 className="w-3.5 h-3.5" />
+                {rentObj.quarterName ?? ""} {rentObj.blockName ?? ""} · {formatArea(rentObj.area)}
+              </p>
+            )}
+          </DialogHeader>
+          <form onSubmit={rentSubmit(handleRent)} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label>Mövcud Sakin</Label>
+              <Controller name="customerId" control={rentCtrl} render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className="rounded-xl h-10"><SelectValue placeholder="Sakin bağla (isteğe bağlı)..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Sakin bağlama —</SelectItem>
+                    {customers?.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.firstName} {c.lastName} {c.fin ? `· ${c.fin}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>İcarədar adı *</Label>
+                <Input {...rentReg("tenantName", { required: true })} className="rounded-xl h-10" placeholder="Ad Soyad" />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefon</Label>
+                <Input {...rentReg("tenantPhone")} className="rounded-xl h-10" placeholder="+994..." />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>FIN</Label>
+                <Input {...rentReg("tenantFin")} className="rounded-xl h-10" placeholder="7 simvol" />
+              </div>
+              <div className="space-y-2">
+                <Label>Müqavilə №</Label>
+                <Input {...rentReg("contractNumber")} className="rounded-xl h-10" placeholder="İcarə-001" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Başlama tarixi *</Label>
+                <Input type="date" {...rentReg("startDate", { required: true })} className="rounded-xl h-10" />
+              </div>
+              <div className="space-y-2">
+                <Label>Bitmə tarixi *</Label>
+                <Input type="date" {...rentReg("endDate", { required: true })} className="rounded-xl h-10" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Aylıq icarə haqqı (AZN) *</Label>
+              <Input type="number" step="0.01" {...rentReg("monthlyAmount", { required: true })}
+                className="rounded-xl h-11" placeholder="Məs: 2000" />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1 rounded-xl" onClick={() => setRentObj(null)}>Ləğv et</Button>
+              <Button type="submit" disabled={rentLoading} className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700">
+                {rentLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "İcarəyə ver"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Edit Dialog ── */}
       <AdminEditDialog
         open={!!editObj}
         onClose={() => setEditObj(null)}
         title={`Redaktə: ${editObj?.number ?? ""}`}
         saveLabel="Yadda saxla"
-        onSave={async (pw) => {
-          await editSubmit(data => handleEdit(pw, data))();
-        }}
+        onSave={async (pw) => { await editSubmit(data => handleEdit(pw, data))(); }}
       >
         <form className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Nömrə / Ad</label>
+            <Label>Nömrə / Ad</Label>
             <Input {...editReg("number", { required: true })} className="rounded-xl h-10" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Sahə (m²)</label>
+            <Label>Sahə (m²)</Label>
             <Input type="number" step="0.01" {...editReg("area")} className="rounded-xl h-10" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Blok</label>
+            <Label>Blok</Label>
             <Controller name="blockId" control={editCtrl} render={({ field }) => (
               <Select onValueChange={field.onChange} value={field.value}>
                 <SelectTrigger className="rounded-xl h-10"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
@@ -332,7 +629,7 @@ export default function ObjectsPage() {
                   <SelectItem value="none">— Seçilməyib —</SelectItem>
                   {blocks?.map(b => (
                     <SelectItem key={b.id} value={b.id.toString()}>
-                      {b.name} {b.quarterName ? `(${b.quarterName})` : ""}
+                      {b.quarterName ? `${b.quarterName} / ` : ""}{b.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -340,7 +637,7 @@ export default function ObjectsPage() {
             )} />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Fəaliyyət Sahəsi</label>
+            <Label>Fəaliyyət Sahəsi</Label>
             <Input {...editReg("activityType")} className="rounded-xl h-10" placeholder="Məs: Ərzaq mağazası..." />
           </div>
         </form>
