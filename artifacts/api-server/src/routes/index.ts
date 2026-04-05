@@ -18,10 +18,16 @@ import authRouter from "./auth";
 import adminRouter from "./admin";
 import floorPriceTiersRouter from "./floor_price_tiers";
 import rentersRouter from "./renters";
+import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
+// Public routes — no auth required
 router.use(healthRouter);
+router.use("/auth", authRouter);
+
+// All routes below require a valid JWT token
+router.use(requireAuth);
 router.use("/quarters", quartersRouter);
 router.use("/buildings", buildingsRouter);
 router.use("/blocks", blocksRouter);
@@ -36,7 +42,6 @@ router.use("/communal", communalRouter);
 router.use("/internet", internetRouter);
 router.use("/tariffs", tariffsRouter);
 router.use("/stats", statsRouter);
-router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/floor-price-tiers", floorPriceTiersRouter);
 router.use("/renters", rentersRouter);
