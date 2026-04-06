@@ -278,7 +278,7 @@ router.delete("/:id", async (req, res) => {
   for (const sale of sales) {
     if (sale.assetType === "apartment") {
       await db.update(apartmentsTable)
-        .set({ status: "available" })
+        .set({ status: "available", handedOver: false })
         .where(eq(apartmentsTable.id, sale.assetId));
     } else {
       await db.update(objectsTable)

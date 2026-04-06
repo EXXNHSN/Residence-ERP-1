@@ -196,6 +196,32 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.delete("/:id", async (req, res) => {
+  const { username, password } = req.body ?? {};
+  if (!(await verifyAdmin(username, password, res))) return;
+
+  const saleId = Number(req.params.id);
+  const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, saleId)).limit(1);
+  if (!sale) return res.status(404).json({ error: "Satış tapılmadı" });
+
+  // Reset asset status + handedOver for apartments
+  if (sale.assetType === "apartment") {
+    await db.update(apartmentsTable)
+      .set({ status: "available", handedOver: false })
+      .where(eq(apartmentsTable.id, sale.assetId));
+  } else {
+    await db.update(objectsTable)
+      .set({ status: "available" })
+      .where(eq(objectsTable.id, sale.assetId));
+  }
+
+  // Delete installments first, then the sale
+  await db.delete(installmentsTable).where(eq(installmentsTable.saleId, saleId));
+  await db.delete(salesTable).where(eq(salesTable.id, saleId));
+
+  res.status(204).send();
+});
+
 router.get("/:id", async (req, res) => {
   const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, Number(req.params.id)));
   if (!sale) return res.status(404).json({ error: "Not found" });

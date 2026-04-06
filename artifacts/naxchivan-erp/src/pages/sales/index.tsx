@@ -17,7 +17,7 @@ import { formatCurrency } from "@/lib/utils";
 import {
   Plus, Loader2, Pencil, CreditCard, Home, Store, Car,
   ChevronDown, ChevronUp, TrendingUp, Search, ReceiptText,
-  Wallet, AlertCircle
+  Wallet, AlertCircle, Trash2
 } from "lucide-react";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -64,8 +64,8 @@ const SECTIONS = [
 
 // ── SaleRow ──────────────────────────────────────────────────
 function SaleRow({
-  sale, isAdmin, onEdit,
-}: { sale: any; isAdmin: boolean; onEdit: (s: any) => void }) {
+  sale, isAdmin, onEdit, onDelete,
+}: { sale: any; isAdmin: boolean; onEdit: (s: any) => void; onDelete: (s: any) => void }) {
   return (
     <TableRow className="hover:bg-muted/20 transition-colors border-b border-border/30 last:border-0 group">
       <TableCell className="pl-5 text-sm text-muted-foreground whitespace-nowrap">
@@ -114,11 +114,18 @@ function SaleRow({
       </TableCell>
       {isAdmin && (
         <TableCell className="pr-4">
-          <Button size="icon" variant="ghost"
-            className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all"
-            onClick={() => onEdit(sale)}>
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+            <Button size="icon" variant="ghost"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              onClick={() => onEdit(sale)}>
+              <Pencil className="w-3.5 h-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => onDelete(sale)}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </TableCell>
       )}
     </TableRow>
@@ -127,12 +134,13 @@ function SaleRow({
 
 // ── SectionPanel ─────────────────────────────────────────────
 function SectionPanel({
-  section, sales, isAdmin, onEdit, isOpen, onToggle,
+  section, sales, isAdmin, onEdit, onDelete, isOpen, onToggle,
 }: {
   section: typeof SECTIONS[number];
   sales: any[];
   isAdmin: boolean;
   onEdit: (s: any) => void;
+  onDelete: (s: any) => void;
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -256,7 +264,7 @@ function SectionPanel({
                 </TableHeader>
                 <TableBody>
                   {sales.map(sale => (
-                    <SaleRow key={sale.id} sale={sale} isAdmin={isAdmin} onEdit={onEdit} />
+                    <SaleRow key={sale.id} sale={sale} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} />
                   ))}
                 </TableBody>
               </Table>
@@ -285,6 +293,8 @@ export default function SalesPage() {
   const [editMonths, setEditMonths] = useState("");
   const [editDate, setEditDate] = useState("");
 
+  const [deleteSale, setDeleteSale] = useState<any>(null);
+
   function toggleSection(key: string) {
     setOpenSections(prev => {
       const next = new Set(prev);
@@ -300,6 +310,23 @@ export default function SalesPage() {
     setEditMonths(sale.installmentMonths?.toString() ?? "12");
     setEditDate(format(new Date(sale.saleDate), "yyyy-MM-dd"));
     setEditOpen(true);
+  }
+
+  async function handleDeleteSale(adminPassword: string) {
+    const res = await fetch(`${BASE()}/api/sales/${deleteSale.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user?.username, password: adminPassword }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Silmə zamanı xəta baş verdi");
+    }
+    toast({ title: "Satış silindi, aktiv boşa çıxarıldı" });
+    qc.invalidateQueries({ queryKey: ["sales"] });
+    qc.invalidateQueries({ queryKey: ["apartments"] });
+    qc.invalidateQueries({ queryKey: ["/api/stats/summary"] });
+    setDeleteSale(null);
   }
 
   async function handleSaveSale(adminPassword: string) {
@@ -439,6 +466,7 @@ export default function SalesPage() {
                 sales={grouped[section.key as keyof typeof grouped]}
                 isAdmin={isAdmin}
                 onEdit={openEdit}
+                onDelete={setDeleteSale}
                 isOpen={openSections.has(section.key)}
                 onToggle={() => toggleSection(section.key)}
               />
@@ -446,6 +474,43 @@ export default function SalesPage() {
           </div>
         )}
       </div>
+
+      {/* ── Delete Dialog ── */}
+      <AdminEditDialog
+        open={!!deleteSale}
+        onClose={() => setDeleteSale(null)}
+        title="Satışı Sil"
+        saveLabel="Sil"
+        saveVariant="destructive"
+        onSave={handleDeleteSale}
+      >
+        {deleteSale && (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-red-50 border border-destructive/20 p-4 text-sm text-destructive space-y-1">
+              <p className="font-semibold">Bu əməliyyat geri qaytarıla bilməz!</p>
+              <p>Aşağıdakı satış silinəcək və aktiv yenidən boş vəziyyətə keçəcək:</p>
+            </div>
+            <div className="rounded-xl bg-muted/50 border border-border/50 p-4 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sakin:</span>
+                <span className="font-semibold">{deleteSale.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Aktiv:</span>
+                <span className="font-medium">{deleteSale.assetDescription}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Satış növü:</span>
+                <StatusBadge status={deleteSale.saleType} />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cəmi məbləğ:</span>
+                <span className="font-bold text-foreground">{formatCurrency(deleteSale.totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </AdminEditDialog>
 
       {/* ── Edit Dialog ── */}
       <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
