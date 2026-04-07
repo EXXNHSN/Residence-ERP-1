@@ -74,7 +74,7 @@ function validateFin(fin: string) {
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [filterType, setFilterType] = useState<"all" | "resident" | "renter">("all");
+  const [filterType, setFilterType] = useState<"all" | "resident" | "apartment" | "objectSale" | "renter">("all");
   const { isAdmin, user } = useAuth();
   const { toast } = useToast();
 
@@ -152,12 +152,16 @@ export default function CustomersPage() {
     if (filterType === "all") return true;
     const b = (cust as any).badges ?? {};
     if (filterType === "resident") return b.apartment || b.objectSale;
+    if (filterType === "apartment") return !!b.apartment;
+    if (filterType === "objectSale") return !!b.objectSale;
     if (filterType === "renter") return !b.apartment && !b.objectSale && (b.objectRental || b.garageRental || b.garageSale);
     return true;
   });
 
-  const residentCount = customers?.filter((c: any) => { const b = (c as any).badges ?? {}; return b.apartment || b.objectSale; }).length ?? 0;
-  const renterCount = customers?.filter((c: any) => { const b = (c as any).badges ?? {}; return !b.apartment && !b.objectSale && (b.objectRental || b.garageRental || b.garageSale); }).length ?? 0;
+  const residentCount    = customers?.filter((c: any) => { const b = (c as any).badges ?? {}; return b.apartment || b.objectSale; }).length ?? 0;
+  const apartmentCount   = customers?.filter((c: any) => !!((c as any).badges ?? {}).apartment).length ?? 0;
+  const objectSaleCount  = customers?.filter((c: any) => !!((c as any).badges ?? {}).objectSale).length ?? 0;
+  const renterCount      = customers?.filter((c: any) => { const b = (c as any).badges ?? {}; return !b.apartment && !b.objectSale && (b.objectRental || b.garageRental || b.garageSale); }).length ?? 0;
 
   return (
     <TooltipProvider>
@@ -230,24 +234,43 @@ export default function CustomersPage() {
           </div>
 
           {/* Filter tabs */}
-          <div className="flex items-center bg-muted/50 rounded-xl p-1 gap-1 w-fit">
+          <div className="flex flex-wrap items-center gap-1 bg-muted/50 rounded-xl p-1 w-fit max-w-full">
+            {/* Hamısı */}
             <button onClick={() => setFilterType("all")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "all" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "all" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
               <User className="w-3.5 h-3.5" />
               Hamısı
               <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "all" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{customers?.length ?? 0}</span>
             </button>
-            <button onClick={() => setFilterType("resident")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "resident" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+
+            {/* Divider */}
+            <span className="w-px h-5 bg-border/60 mx-0.5" />
+
+            {/* Mənzil alanlar */}
+            <button onClick={() => setFilterType("apartment")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "apartment" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
               <Home className="w-3.5 h-3.5 text-blue-500" />
-              Sakinlər
-              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "resident" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"}`}>{residentCount}</span>
+              Mənzil alanlar
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "apartment" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"}`}>{apartmentCount}</span>
             </button>
+
+            {/* Qeyri Yaşayış alanlar */}
+            <button onClick={() => setFilterType("objectSale")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "objectSale" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <Store className="w-3.5 h-3.5 text-amber-500" />
+              Qeyri Yaşayış alanlar
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "objectSale" ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>{objectSaleCount}</span>
+            </button>
+
+            {/* Divider */}
+            <span className="w-px h-5 bg-border/60 mx-0.5" />
+
+            {/* İcarəçilər */}
             <button onClick={() => setFilterType("renter")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "renter" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              <Key className="w-3.5 h-3.5 text-amber-500" />
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "renter" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <Key className="w-3.5 h-3.5 text-violet-500" />
               İcarəçilər
-              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "renter" ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>{renterCount}</span>
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "renter" ? "bg-violet-100 text-violet-700" : "bg-muted text-muted-foreground"}`}>{renterCount}</span>
             </button>
           </div>
 
