@@ -111,6 +111,12 @@ Full-stack property management system for a residential complex.
 - Installment tracking with expandable rows, overdue detection
 - Rentals, communal billing, internet subscriptions, tariffs
 - Sales with customer creation inline
+- **Dashboard**: kvartal-filtered stats, breakdown by Mənzil/QeyriYaşayış/Avto satış, İcarə (2 types), Kommunal
+- **Stats API**: `GET /api/stats/summary?quarterId=N` — filters all stats by quarter
+- **Tariffs**: `object_monthly_rent` tariff key added for non-residential monthly rental
+- **Objects page**: kvartal + block filter dropdowns
+- **Customers page**: tab-style filter (Hamısı/Sakinlər/İcarəçilər)
+- **Garage rental dialog**: "Müqavilə №" renamed to "Avtomobil nömrəsi" (stores car plate)
 
 ### Auth
 - Login: `POST /api/auth/login` → returns user object, stored in localStorage

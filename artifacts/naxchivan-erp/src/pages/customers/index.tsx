@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2, Search, Phone, Pencil, Trash2, User, Home, Car, Store, ParkingCircle, Building2 } from "lucide-react";
+import { Plus, Loader2, Search, Phone, Pencil, Trash2, User, Home, Car, Store, ParkingCircle, Building2, Key } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListCustomersQueryKey } from "@workspace/api-client-react";
 import { useForm } from "react-hook-form";
@@ -230,18 +230,24 @@ export default function CustomersPage() {
           </div>
 
           {/* Filter tabs */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center bg-muted/50 rounded-xl p-1 gap-1 w-fit">
             <button onClick={() => setFilterType("all")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-medium border transition-all ${filterType === "all" ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border/50 text-muted-foreground hover:border-primary/40"}`}>
-              <User className="w-3.5 h-3.5" /> Hamısı <span className="opacity-70">({customers?.length ?? 0})</span>
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "all" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <User className="w-3.5 h-3.5" />
+              Hamısı
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "all" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{customers?.length ?? 0}</span>
             </button>
             <button onClick={() => setFilterType("resident")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-medium border transition-all ${filterType === "resident" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-card border-border/50 text-muted-foreground hover:border-blue-400"}`}>
-              <Home className="w-3.5 h-3.5" /> Sakinlər <span className="opacity-70">({residentCount})</span>
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "resident" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <Home className="w-3.5 h-3.5 text-blue-500" />
+              Sakinlər
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "resident" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"}`}>{residentCount}</span>
             </button>
             <button onClick={() => setFilterType("renter")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-medium border transition-all ${filterType === "renter" ? "bg-amber-600 text-white border-amber-600 shadow-sm" : "bg-card border-border/50 text-muted-foreground hover:border-amber-400"}`}>
-              <Store className="w-3.5 h-3.5" /> Yalnız İcarəçilər <span className="opacity-70">({renterCount})</span>
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "renter" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <Key className="w-3.5 h-3.5 text-amber-500" />
+              İcarəçilər
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "renter" ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>{renterCount}</span>
             </button>
           </div>
 

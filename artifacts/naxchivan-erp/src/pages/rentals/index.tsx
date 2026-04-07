@@ -656,9 +656,9 @@ export default function RentalsPage() {
             <div className="bg-muted/40 rounded-xl p-4 space-y-3">
               <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Müqavilə Məlumatları</p>
               <div>
-                <label className="text-sm font-medium">Müqavilə №</label>
+                <label className="text-sm font-medium">Avtomobil nömrəsi</label>
                 <Input value={garageContractNumber} onChange={e => setGarageContractNumber(e.target.value)}
-                  className="rounded-xl h-10 mt-1" placeholder="MQ-2025-001" />
+                  className="rounded-xl h-10 mt-1" placeholder="10-AA-123" />
               </div>
               <div>
                 <label className="text-sm font-medium">Aylıq İcarə (₼)</label>

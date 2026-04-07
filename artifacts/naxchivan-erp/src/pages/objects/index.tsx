@@ -25,6 +25,8 @@ const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function ObjectsPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterKvartal, setFilterKvartal] = useState("all");
+  const [filterBlock, setFilterBlock] = useState("all");
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
@@ -187,10 +189,28 @@ export default function ObjectsPage() {
     }
   }
 
+  const uniqueKvartals = useMemo(() => {
+    if (!blocks) return [];
+    const seen = new Set<number>();
+    return blocks.filter((b: any) => b.quarterId && !seen.has(b.quarterId) && seen.add(b.quarterId))
+      .map((b: any) => ({ id: b.quarterId, name: b.quarterName ?? `Kvartal ${b.quarterId}` }));
+  }, [blocks]);
+
+  const filteredBlocksForFilter = useMemo(() => {
+    if (!blocks) return [];
+    if (filterKvartal === "all") return blocks;
+    return blocks.filter((b: any) => b.quarterId?.toString() === filterKvartal);
+  }, [blocks, filterKvartal]);
+
   const filtered = useMemo(() => {
     if (!allObjects) return [];
     return allObjects.filter((o: any) => {
       if (filterStatus !== "all" && o.status !== filterStatus) return false;
+      if (filterBlock !== "all" && o.blockId?.toString() !== filterBlock) return false;
+      if (filterKvartal !== "all" && filterBlock === "all") {
+        const block = blocks?.find((b: any) => b.id === o.blockId);
+        if (!block || block.quarterId?.toString() !== filterKvartal) return false;
+      }
       if (search.trim()) {
         const q = search.toLowerCase();
         const match =
@@ -203,7 +223,7 @@ export default function ObjectsPage() {
       }
       return true;
     });
-  }, [allObjects, filterStatus, search]);
+  }, [allObjects, filterStatus, filterKvartal, filterBlock, search, blocks]);
 
   const stats = useMemo(() => ({
     total: allObjects?.length ?? 0,
@@ -298,16 +318,48 @@ export default function ObjectsPage() {
           ))}
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 max-w-sm min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Ad, fəaliyyət, blok, icarəçi..." className="pl-9 rounded-xl h-10 bg-card border-border/60" />
           </div>
+          <Select value={filterKvartal} onValueChange={v => { setFilterKvartal(v); setFilterBlock("all"); }}>
+            <SelectTrigger className="w-[160px] rounded-xl h-10 bg-card"><SelectValue placeholder="Kvartal" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Bütün Kvartallar</SelectItem>
+              {uniqueKvartals.map((q: any) => <SelectItem key={q.id} value={q.id.toString()}>{q.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterBlock} onValueChange={setFilterBlock}>
+            <SelectTrigger className="w-[170px] rounded-xl h-10 bg-card"><SelectValue placeholder="Blok" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Bütün Bloklar</SelectItem>
+              {filteredBlocksForFilter.map((b: any) => (
+                <SelectItem key={b.id} value={b.id.toString()}>
+                  {b.name}{b.quarterName ? ` (${b.quarterName})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(filterKvartal !== "all" || filterBlock !== "all" || search) && (
+            <button onClick={() => { setFilterKvartal("all"); setFilterBlock("all"); setSearch(""); }}
+              className="text-xs text-primary hover:underline">
+              Sıfırla
+            </button>
+          )}
           {tariffs && (
-            <div className="text-xs text-muted-foreground hidden sm:block">
-              1 m² = <span className="font-semibold text-foreground">{formatCurrency(tariffs.objectPricePerSqm)}</span>
+            <div className="text-xs text-muted-foreground hidden sm:flex items-center gap-1.5 ml-auto">
+              <span>1 m² satış:</span>
+              <span className="font-semibold text-foreground">{formatCurrency(tariffs.objectPricePerSqm)}</span>
+              {(tariffs as any).objectMonthlyRent && (
+                <>
+                  <span className="text-border">·</span>
+                  <span>Aylıq İcarə:</span>
+                  <span className="font-semibold text-foreground">{formatCurrency((tariffs as any).objectMonthlyRent)}</span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -452,8 +504,8 @@ export default function ObjectsPage() {
           {filtered.length > 0 && (
             <div className="px-5 py-2.5 border-t border-border/40 bg-muted/20 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{filtered.length} nəticə</span>
-              {(filterStatus !== "all" || search) && (
-                <button onClick={() => { setFilterStatus("all"); setSearch(""); }} className="text-xs text-primary hover:underline">
+              {(filterStatus !== "all" || filterKvartal !== "all" || filterBlock !== "all" || search) && (
+                <button onClick={() => { setFilterStatus("all"); setFilterKvartal("all"); setFilterBlock("all"); setSearch(""); }} className="text-xs text-primary hover:underline">
                   Filteri sıfırla
                 </button>
               )}

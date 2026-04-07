@@ -49,6 +49,7 @@ export default function TariffsPage() {
       communalTariff: "",
       apartmentPricePerSqm: "",
       objectPricePerSqm: "",
+      objectMonthlyRent: "",
       garagePricePerSqm: "",
       garageSalePrice: "",
       garageMonthlyRent: "",
@@ -61,6 +62,7 @@ export default function TariffsPage() {
         communalTariff: tariffs.communalTariff.toString(),
         apartmentPricePerSqm: tariffs.apartmentPricePerSqm.toString(),
         objectPricePerSqm: tariffs.objectPricePerSqm.toString(),
+        objectMonthlyRent: ((tariffs as any).objectMonthlyRent ?? 500).toString(),
         garagePricePerSqm: tariffs.garagePricePerSqm.toString(),
         garageSalePrice: ((tariffs as any).garageSalePrice ?? 5000).toString(),
         garageMonthlyRent: ((tariffs as any).garageMonthlyRent ?? 100).toString(),
@@ -83,6 +85,7 @@ export default function TariffsPage() {
         communalTariff: Number(data.communalTariff),
         apartmentPricePerSqm: Number(data.apartmentPricePerSqm),
         objectPricePerSqm: Number(data.objectPricePerSqm),
+        objectMonthlyRent: Number(data.objectMonthlyRent),
         garagePricePerSqm: Number(data.garagePricePerSqm),
         garageSalePrice: Number(data.garageSalePrice),
         garageMonthlyRent: Number(data.garageMonthlyRent),
@@ -214,12 +217,23 @@ export default function TariffsPage() {
                     <Input type="number" step="0.01" {...register("apartmentPricePerSqm")} className="rounded-xl h-12" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Obyekt 1 m² (AZN)</label>
+                    <label className="text-sm font-medium text-foreground">Obyekt 1 m² satış (AZN)</label>
                     <Input type="number" step="0.01" {...register("objectPricePerSqm")} className="rounded-xl h-12" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Avto Dayanacaq 1 m² (AZN)</label>
                     <Input type="number" step="0.01" {...register("garagePricePerSqm")} className="rounded-xl h-12" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border/50 space-y-4">
+                <h3 className="font-semibold text-lg">Qeyri Yaşayış Sabit İcarə Qiyməti</h3>
+                <p className="text-xs text-muted-foreground -mt-2">Qeyri yaşayış sahəsi üçün standart aylıq icarə məbləği.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Qeyri Yaşayış Aylıq İcarə (AZN)</label>
+                    <Input type="number" step="1" {...register("objectMonthlyRent")} className="rounded-xl h-12" />
                   </div>
                 </div>
               </div>
