@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2, Search, Phone, Pencil, Trash2, User, Home, Car, Store, ParkingCircle, Building2, Key } from "lucide-react";
+import { Plus, Loader2, Search, Phone, Pencil, Trash2, User, Home, Car, Store, ParkingCircle, Building2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListCustomersQueryKey } from "@workspace/api-client-react";
 import { useForm } from "react-hook-form";
@@ -74,7 +74,7 @@ function validateFin(fin: string) {
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [filterType, setFilterType] = useState<"all" | "resident" | "apartment" | "objectSale" | "renter">("all");
+  const [filterType, setFilterType] = useState<"all" | "apartment" | "objectSale">("all");
   const { isAdmin, user } = useAuth();
   const { toast } = useToast();
 
@@ -151,17 +151,13 @@ export default function CustomersPage() {
   const filteredCustomers = customers?.filter((cust: any) => {
     if (filterType === "all") return true;
     const b = (cust as any).badges ?? {};
-    if (filterType === "resident") return b.apartment || b.objectSale;
     if (filterType === "apartment") return !!b.apartment;
     if (filterType === "objectSale") return !!b.objectSale;
-    if (filterType === "renter") return !b.apartment && !b.objectSale && (b.objectRental || b.garageRental || b.garageSale);
     return true;
   });
 
-  const residentCount    = customers?.filter((c: any) => { const b = (c as any).badges ?? {}; return b.apartment || b.objectSale; }).length ?? 0;
-  const apartmentCount   = customers?.filter((c: any) => !!((c as any).badges ?? {}).apartment).length ?? 0;
-  const objectSaleCount  = customers?.filter((c: any) => !!((c as any).badges ?? {}).objectSale).length ?? 0;
-  const renterCount      = customers?.filter((c: any) => { const b = (c as any).badges ?? {}; return !b.apartment && !b.objectSale && (b.objectRental || b.garageRental || b.garageSale); }).length ?? 0;
+  const apartmentCount  = customers?.filter((c: any) => !!((c as any).badges ?? {}).apartment).length ?? 0;
+  const objectSaleCount = customers?.filter((c: any) => !!((c as any).badges ?? {}).objectSale).length ?? 0;
 
   return (
     <TooltipProvider>
@@ -262,16 +258,6 @@ export default function CustomersPage() {
               <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "objectSale" ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>{objectSaleCount}</span>
             </button>
 
-            {/* Divider */}
-            <span className="w-px h-5 bg-border/60 mx-0.5" />
-
-            {/* İcarəçilər */}
-            <button onClick={() => setFilterType("renter")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${filterType === "renter" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              <Key className="w-3.5 h-3.5 text-violet-500" />
-              İcarəçilər
-              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${filterType === "renter" ? "bg-violet-100 text-violet-700" : "bg-muted text-muted-foreground"}`}>{renterCount}</span>
-            </button>
           </div>
 
           {/* Legend */}
