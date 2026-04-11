@@ -23,6 +23,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { IdCardInput, type IdCardType } from "@/components/IdCardInput";
 
 function toRoman(num: number): string {
   const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
@@ -59,6 +60,9 @@ export default function CreateSalePage() {
   const { data: objects } = useListObjects({ status: ObjectStatus.available });
   const { data: tariffs } = useListTariffs();
   const { data: blocks } = useListBlocks();
+
+  const [saleIdCardType, setSaleIdCardType] = useState<IdCardType>("");
+  const [saleIdCardNumber, setSaleIdCardNumber] = useState("");
 
   const { mutateAsync: createCustomer } = useCreateCustomer();
   const { mutateAsync: createSale, isPending } = useCreateSale();
@@ -214,7 +218,9 @@ export default function CreateSalePage() {
           fin: data.fin || undefined,
           phone: data.phone,
           address: data.address || undefined,
-        }
+          idCardType: saleIdCardType || undefined,
+          idCardNumber: saleIdCardNumber?.trim() || undefined,
+        } as any
       });
 
       const isGarage = data.assetType === 'garage';
@@ -330,6 +336,14 @@ export default function CreateSalePage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Ünvan</label>
                   <Input {...register("address")} placeholder="Naxçıvan, ..." className="rounded-xl h-12 bg-slate-50" />
+                </div>
+                <div className="border-t border-border/50 pt-3">
+                  <IdCardInput
+                    idCardType={saleIdCardType}
+                    idCardNumber={saleIdCardNumber}
+                    onTypeChange={setSaleIdCardType}
+                    onNumberChange={setSaleIdCardNumber}
+                  />
                 </div>
               </CardContent>
             </Card>

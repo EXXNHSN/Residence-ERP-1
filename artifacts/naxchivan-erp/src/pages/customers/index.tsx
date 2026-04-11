@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2, Search, Phone, Pencil, Trash2, User, Home, Car, Store, ParkingCircle, Building2 } from "lucide-react";
+import { Plus, Loader2, Search, Phone, Pencil, Trash2, User, Home, Car, Store, ParkingCircle, Building2, CreditCard } from "lucide-react";
+import { IdCardInput, type IdCardType } from "@/components/IdCardInput";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListCustomersQueryKey } from "@workspace/api-client-react";
 import { useForm } from "react-hook-form";
@@ -88,12 +89,24 @@ export default function CustomersPage() {
   const [editFin, setEditFin] = useState("");
   const [editFinError, setEditFinError] = useState<string | null>(null);
   const [editAddress, setEditAddress] = useState("");
+  const [editIdCardType, setEditIdCardType] = useState<IdCardType>("");
+  const [editIdCardNumber, setEditIdCardNumber] = useState("");
+
+  // Create form ID card state
+  const [createIdCardType, setCreateIdCardType] = useState<IdCardType>("");
+  const [createIdCardNumber, setCreateIdCardNumber] = useState("");
 
   const { data: customers, isLoading } = useListCustomers({ search: search || undefined });
   const queryClient = useQueryClient();
   const { mutate: createCustomer, isPending } = useCreateCustomer({
     mutation: {
-      onSuccess: () => { setIsOpen(false); reset(); queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() }); }
+      onSuccess: () => {
+        setIsOpen(false);
+        reset();
+        setCreateIdCardType("");
+        setCreateIdCardNumber("");
+        queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+      }
     }
   });
 
@@ -104,7 +117,14 @@ export default function CustomersPage() {
   const onSubmit = (data: any) => {
     const finErr = validateFin(data.fin);
     if (finErr !== true) { setError("fin", { message: finErr }); return; }
-    createCustomer({ data: { ...data, fin: data.fin?.trim().toUpperCase() || null } });
+    createCustomer({
+      data: {
+        ...data,
+        fin: data.fin?.trim().toUpperCase() || null,
+        idCardType: createIdCardType || null,
+        idCardNumber: createIdCardNumber?.trim() || null,
+      } as any
+    });
   };
 
   function openEdit(cust: any) {
@@ -115,6 +135,8 @@ export default function CustomersPage() {
     setEditFin(cust.fin ?? "");
     setEditFinError(null);
     setEditAddress(cust.address ?? "");
+    setEditIdCardType((cust.idCardType as IdCardType) ?? "");
+    setEditIdCardNumber(cust.idCardNumber ?? "");
     setEditOpen(true);
   }
 
@@ -140,6 +162,8 @@ export default function CustomersPage() {
         username: user?.username, password: adminPassword,
         firstName: editFirstName, lastName: editLastName, phone: editPhone,
         fin: editFin?.trim().toUpperCase() || null, address: editAddress,
+        idCardType: editIdCardType || null,
+        idCardNumber: editIdCardNumber?.trim() || null,
       }),
     });
     if (!res.ok) { const err = await res.json().catch(() => ({ error: "Xəta" })); throw new Error(err.error ?? "Xəta baş verdi"); }
@@ -220,6 +244,15 @@ export default function CustomersPage() {
                       <Input {...register("address")} className="rounded-xl h-11" />
                     </div>
 
+                    <div className="border-t border-border/50 pt-3">
+                      <IdCardInput
+                        idCardType={createIdCardType}
+                        idCardNumber={createIdCardNumber}
+                        onTypeChange={setCreateIdCardType}
+                        onNumberChange={setCreateIdCardNumber}
+                      />
+                    </div>
+
                     <Button type="submit" disabled={isPending} className="w-full h-12 rounded-xl text-md mt-4">
                       {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Əlavə et"}
                     </Button>
@@ -287,6 +320,7 @@ export default function CustomersPage() {
                     <TableHead>Sakin / İcarəçi</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>FIN</TableHead>
+                    <TableHead>Vəsiqə №</TableHead>
                     <TableHead>Telefon</TableHead>
                     <TableHead className="text-right">Əməliyyat</TableHead>
                   </TableRow>
@@ -294,7 +328,7 @@ export default function CustomersPage() {
                 <TableBody>
                   {filteredCustomers?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Məlumat tapılmadı</TableCell>
                     </TableRow>
                   ) : filteredCustomers?.map((cust: any) => {
                     const badges = cust.badges ?? {};
@@ -323,6 +357,16 @@ export default function CustomersPage() {
                         <TableCell>
                           {cust.fin
                             ? <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-lg">{cust.fin}</span>
+                            : <span className="text-muted-foreground text-sm">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          {cust.idCardNumber
+                            ? (
+                              <div className="flex items-center gap-1.5">
+                                <CreditCard className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                <span className="font-mono text-sm">{cust.idCardNumber}</span>
+                              </div>
+                            )
                             : <span className="text-muted-foreground text-sm">—</span>}
                         </TableCell>
                         <TableCell>
@@ -405,6 +449,14 @@ export default function CustomersPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Ünvan</label>
                 <Input value={editAddress} onChange={e => setEditAddress(e.target.value)} className="rounded-xl h-11" />
+              </div>
+              <div className="border-t border-border/50 pt-3">
+                <IdCardInput
+                  idCardType={editIdCardType}
+                  idCardNumber={editIdCardNumber}
+                  onTypeChange={setEditIdCardType}
+                  onNumberChange={setEditIdCardNumber}
+                />
               </div>
             </div>
           )}

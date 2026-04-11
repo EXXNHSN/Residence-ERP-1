@@ -63,7 +63,7 @@ function finValidation(fin: string | null | undefined): string | null {
 
 // POST /customers — FIN-based deduplication: if same FIN exists, return existing customer
 router.post("/", async (req, res) => {
-  const { firstName, lastName, fin, phone, address } = req.body;
+  const { firstName, lastName, fin, phone, address, idCardType, idCardNumber } = req.body;
   const finErr = finValidation(fin);
   if (finErr) return res.status(400).json({ error: finErr });
 
@@ -78,7 +78,11 @@ router.post("/", async (req, res) => {
 
   const [customer] = await db
     .insert(customersTable)
-    .values({ firstName, lastName, fin: fin?.trim() || null, phone, address })
+    .values({
+      firstName, lastName, fin: fin?.trim() || null, phone, address,
+      idCardType: idCardType || null,
+      idCardNumber: idCardNumber?.trim() || null,
+    })
     .returning();
   res.status(201).json(customer);
 });
@@ -243,7 +247,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { username, password, firstName, lastName, fin, phone, address } = req.body ?? {};
+  const { username, password, firstName, lastName, fin, phone, address, idCardType, idCardNumber } = req.body ?? {};
   if (!(await verifyAdmin(username, password, res))) return;
   if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
     return res.status(400).json({ error: "Ad, soyad və telefon tələb olunur" });
@@ -258,6 +262,8 @@ router.put("/:id", async (req, res) => {
       phone: phone.trim(),
       fin: fin?.trim() || null,
       address: address?.trim() || null,
+      idCardType: idCardType || null,
+      idCardNumber: idCardNumber?.trim() || null,
     })
     .where(eq(customersTable.id, Number(req.params.id)))
     .returning();
