@@ -64,11 +64,14 @@ async function enrichSale(sale: typeof salesTable.$inferSelect) {
     assetType: sale.assetType,
     assetId: sale.assetId,
     assetDescription: asset.description,
+    area: asset.area,
     saleType: sale.saleType,
     totalAmount,
     downPayment,
     installmentMonths: sale.installmentMonths,
     monthlyPayment: Number(sale.monthlyPayment),
+    pricePerSqm: sale.pricePerSqm ? Number(sale.pricePerSqm) : null,
+    contractNumber: sale.contractNumber ?? null,
     paidAmount: totalPaid,
     remainingAmount: remaining,
     saleDate: sale.saleDate.toISOString(),
@@ -108,7 +111,7 @@ router.post("/calculate", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { customerId, assetType, assetId, saleType, downPayment, installmentMonths, pricePerSqm, totalAmountOverride } = req.body;
+  const { customerId, assetType, assetId, saleType, downPayment, installmentMonths, pricePerSqm, totalAmountOverride, contractNumber } = req.body;
 
   const asset = await getAssetInfo(assetType, assetId);
 
@@ -139,6 +142,8 @@ router.post("/", async (req, res) => {
       downPayment: String(downPayment ?? 0),
       installmentMonths: months,
       monthlyPayment: String(monthlyPayment),
+      pricePerSqm: pricePerSqm ? String(pricePerSqm) : null,
+      contractNumber: contractNumber?.trim() || null,
       saleDate: new Date(),
     })
     .returning();

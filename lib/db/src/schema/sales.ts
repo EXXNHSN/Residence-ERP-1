@@ -13,6 +13,8 @@ export const salesTable = pgTable("sales", {
   downPayment: numeric("down_payment", { precision: 12, scale: 2 }).notNull().default("0"),
   installmentMonths: integer("installment_months").notNull().default(0),
   monthlyPayment: numeric("monthly_payment", { precision: 12, scale: 2 }).notNull().default("0"),
+  pricePerSqm: numeric("price_per_sqm", { precision: 12, scale: 2 }),
+  contractNumber: text("contract_number"),
   saleDate: timestamp("sale_date").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

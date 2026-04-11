@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
 import { useLocation } from "wouter";
-import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, Layers, SquareStack, X, SlidersHorizontal, Zap } from "lucide-react";
+import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, Layers, SquareStack, X, SlidersHorizontal, Zap, FileText, Receipt } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -244,6 +244,7 @@ export default function CreateSalePage() {
           pricePerSqm: isGarage ? 0 : Number(data.pricePerSqm),
           downPayment: data.saleType === 'credit' ? Number(data.downPayment) : 0,
           installmentMonths: data.saleType === 'credit' ? Number(data.installmentMonths) : undefined,
+          contractNumber: data.contractNumber?.trim() || undefined,
           ...(isGarage ? { totalAmountOverride: calcResult.total } : {}),
         } as any
       });
@@ -609,6 +610,14 @@ export default function CreateSalePage() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                    Müqavilə Nömrəsi
+                  </label>
+                  <Input {...register("contractNumber")} placeholder="M-2024-001" className="rounded-xl h-12 bg-slate-50" />
+                </div>
+
                 {watchSaleType === 'credit' && (
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
                     <div className="space-y-2">
@@ -655,6 +664,33 @@ export default function CreateSalePage() {
                     </div>
                   </>
                 )}
+
+                {/* ƏDV section — apartments only */}
+                {watchAssetType === 'apartment' && calcResult.total > 0 && (
+                  <div className="pt-4 border-t border-border/50 space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Receipt className="w-4 h-4 text-amber-600" />
+                      <p className="text-sm font-semibold text-amber-700">ƏDV Məlumatı</p>
+                    </div>
+                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 space-y-2.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Şirkət ƏDV (18%)</span>
+                        <span className="font-bold text-amber-700">{formatCurrency(calcResult.total * 0.18)}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-snug">Mənzil dəyərinin 18%-i şirkətin ƏDV hesabına köçürülür.</p>
+                    </div>
+                    {watchSaleType === 'cash' && (
+                      <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200 space-y-2.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Müştəriyə ƏDV qaytarma (30%×18%)</span>
+                          <span className="font-bold text-emerald-700">{formatCurrency(calcResult.total * 0.18 * 0.30)}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground leading-snug">Nağd ödənişdə dövlət tərəfindən müştəriyə ƏDV-nin 30%-i geri qaytarılır.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Button type="submit" disabled={loading || !watchAssetId} className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all mt-6">
                   {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Satışı Təsdiqlə"}
                 </Button>
