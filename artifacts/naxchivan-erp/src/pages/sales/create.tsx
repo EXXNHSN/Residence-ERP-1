@@ -63,6 +63,7 @@ export default function CreateSalePage() {
 
   const [saleIdCardType, setSaleIdCardType] = useState<IdCardType>("");
   const [saleIdCardNumber, setSaleIdCardNumber] = useState("");
+  const [idCardError, setIdCardError] = useState("");
 
   const { mutateAsync: createCustomer } = useCreateCustomer();
   const { mutateAsync: createSale, isPending } = useCreateSale();
@@ -209,6 +210,16 @@ export default function CreateSalePage() {
   }, [watchAssetType, watchAssetId, watchPrice, watchSaleType, watchDownPayment, watchMonths, apartments, objects]);
 
   const onSubmit = async (data: any) => {
+    // Validate ID card separately (not managed by react-hook-form)
+    if (!saleIdCardType) {
+      setIdCardError("Şəxsiyyət vəsiqəsinin növü mütləqdir");
+      return;
+    }
+    if (!saleIdCardNumber.trim()) {
+      setIdCardError("Şəxsiyyət vəsiqəsinin nömrəsi mütləqdir");
+      return;
+    }
+    setIdCardError("");
     setIsSubmitting(true);
     try {
       const customer = await createCustomer({
@@ -311,38 +322,46 @@ export default function CreateSalePage() {
               </CardHeader>
               <CardContent className="p-6 pt-2 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Ad <span className="text-destructive">*</span></label>
-                    <Input {...register("firstName", { required: true })} placeholder="Əli"
+                    <Input {...register("firstName", { required: "Tələb olunur" })} placeholder="Əli"
                       className={`rounded-xl h-12 bg-slate-50 ${errors.firstName ? "border-destructive" : ""}`} />
+                    {errors.firstName && <p className="text-xs text-destructive">{errors.firstName.message as string}</p>}
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Soyad <span className="text-destructive">*</span></label>
-                    <Input {...register("lastName", { required: true })} placeholder="Əliyev"
+                    <Input {...register("lastName", { required: "Tələb olunur" })} placeholder="Əliyev"
                       className={`rounded-xl h-12 bg-slate-50 ${errors.lastName ? "border-destructive" : ""}`} />
+                    {errors.lastName && <p className="text-xs text-destructive">{errors.lastName.message as string}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Telefon <span className="text-destructive">*</span></label>
-                    <Input {...register("phone", { required: true })} placeholder="+994 50 000 00 00"
+                    <Input {...register("phone", { required: "Tələb olunur" })} placeholder="+994 50 000 00 00"
                       className={`rounded-xl h-12 bg-slate-50 ${errors.phone ? "border-destructive" : ""}`} />
+                    {errors.phone && <p className="text-xs text-destructive">{errors.phone.message as string}</p>}
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">FİN Kod</label>
-                    <Input {...register("fin")} placeholder="1234ABC" className="rounded-xl h-12 bg-slate-50" />
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">FİN Kod <span className="text-destructive">*</span></label>
+                    <Input {...register("fin", { required: "Tələb olunur" })} placeholder="1234ABC"
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.fin ? "border-destructive" : ""}`} />
+                    {errors.fin && <p className="text-xs text-destructive">{errors.fin.message as string}</p>}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Ünvan</label>
-                  <Input {...register("address")} placeholder="Naxçıvan, ..." className="rounded-xl h-12 bg-slate-50" />
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Ünvan <span className="text-destructive">*</span></label>
+                  <Input {...register("address", { required: "Tələb olunur" })} placeholder="Naxçıvan, ..."
+                    className={`rounded-xl h-12 bg-slate-50 ${errors.address ? "border-destructive" : ""}`} />
+                  {errors.address && <p className="text-xs text-destructive">{errors.address.message as string}</p>}
                 </div>
                 <div className="border-t border-border/50 pt-3">
                   <IdCardInput
                     idCardType={saleIdCardType}
                     idCardNumber={saleIdCardNumber}
-                    onTypeChange={setSaleIdCardType}
-                    onNumberChange={setSaleIdCardNumber}
+                    onTypeChange={t => { setSaleIdCardType(t); if (t) setIdCardError(""); }}
+                    onNumberChange={n => { setSaleIdCardNumber(n); if (n.trim()) setIdCardError(""); }}
+                    error={idCardError}
                   />
                 </div>
               </CardContent>

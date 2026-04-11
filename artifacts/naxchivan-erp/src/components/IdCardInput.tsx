@@ -23,9 +23,10 @@ interface Props {
   idCardNumber: string;
   onTypeChange: (t: IdCardType) => void;
   onNumberChange: (n: string) => void;
+  error?: string;
 }
 
-export function IdCardInput({ idCardType, idCardNumber, onTypeChange, onNumberChange }: Props) {
+export function IdCardInput({ idCardType, idCardNumber, onTypeChange, onNumberChange, error }: Props) {
   const group = typeToGroup(idCardType);
 
   function handleGroupChange(g: GroupType) {
@@ -38,9 +39,11 @@ export function IdCardInput({ idCardType, idCardNumber, onTypeChange, onNumberCh
   return (
     <div className="space-y-2">
       <div className="space-y-2">
-        <label className="text-sm font-medium">Vəsiqənin növü</label>
+        <label className="text-sm font-medium">
+          Vəsiqənin növü <span className="text-destructive">*</span>
+        </label>
         <Select value={group || "none"} onValueChange={v => handleGroupChange(v === "none" ? "" : v as GroupType)}>
-          <SelectTrigger className="rounded-xl h-11">
+          <SelectTrigger className={`rounded-xl h-11 ${error && !idCardType ? "border-destructive" : ""}`}>
             <SelectValue placeholder="Seçin..." />
           </SelectTrigger>
           <SelectContent>
@@ -69,14 +72,23 @@ export function IdCardInput({ idCardType, idCardNumber, onTypeChange, onNumberCh
 
       {idCardType && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Vəsiqənin nömrəsi</label>
+          <label className="text-sm font-medium">
+            Vəsiqənin nömrəsi <span className="text-destructive">*</span>
+          </label>
           <Input
             value={idCardNumber}
             onChange={e => onNumberChange(e.target.value.toUpperCase())}
-            className="rounded-xl h-11 font-mono"
+            className={`rounded-xl h-11 font-mono ${error && !idCardNumber.trim() ? "border-destructive" : ""}`}
             placeholder={placeholder(idCardType)}
           />
+          {error && !idCardNumber.trim() && (
+            <p className="text-xs text-destructive">{error}</p>
+          )}
         </div>
+      )}
+
+      {error && !idCardType && (
+        <p className="text-xs text-destructive">{error}</p>
       )}
     </div>
   );
