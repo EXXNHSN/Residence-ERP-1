@@ -27,45 +27,40 @@ function formatDateAz(date: Date): string {
 const ONES = ["", "bir", "iki", "üç", "dörd", "beş", "altı", "yeddi", "səkkiz", "doqquz"];
 const TENS = ["", "on", "iyirmi", "otuz", "qırx", "əlli", "altmış", "yetmiş", "səksən", "doxsan"];
 
-function numToAz(n: number): string {
+/** Convert a non-negative integer to Azerbaijani words (no currency suffix) */
+function intToWords(n: number): string {
   if (n === 0) return "sıfır";
-  if (n < 0) return "mənfi " + numToAz(-n);
-
-  const integer = Math.floor(n);
-  const decimal = Math.round((n - integer) * 100);
-
   let result = "";
-
-  if (integer >= 1000000) {
-    result += numToAz(Math.floor(integer / 1000000)) + " milyon ";
-    const rest = integer % 1000000;
-    if (rest > 0) result += numToAz(rest);
-    result = result.trim();
-  } else if (integer >= 1000) {
-    const thousands = Math.floor(integer / 1000);
-    result += (thousands === 1 ? "min" : numToAz(thousands) + " min");
-    const rest = integer % 1000;
-    if (rest > 0) result += " " + numToAz(rest);
-  } else if (integer >= 100) {
-    const hundreds = Math.floor(integer / 100);
+  if (n >= 1000000) {
+    result += intToWords(Math.floor(n / 1000000)) + " milyon";
+    const rest = n % 1000000;
+    if (rest > 0) result += " " + intToWords(rest);
+  } else if (n >= 1000) {
+    const thousands = Math.floor(n / 1000);
+    result += (thousands === 1 ? "min" : intToWords(thousands) + " min");
+    const rest = n % 1000;
+    if (rest > 0) result += " " + intToWords(rest);
+  } else if (n >= 100) {
+    const hundreds = Math.floor(n / 100);
     result += (hundreds === 1 ? "yüz" : ONES[hundreds] + " yüz");
-    const rest = integer % 100;
-    if (rest > 0) result += " " + numToAz(rest);
-  } else if (integer >= 10) {
-    result += TENS[Math.floor(integer / 10)];
-    const ones = integer % 10;
+    const rest = n % 100;
+    if (rest > 0) result += " " + intToWords(rest);
+  } else if (n >= 10) {
+    result += TENS[Math.floor(n / 10)];
+    const ones = n % 10;
     if (ones > 0) result += " " + ONES[ones];
   } else {
-    result += ONES[integer];
+    result += ONES[n];
   }
-
-  if (decimal > 0) {
-    result += ` manat ${decimal} qəpik`;
-  } else {
-    result += " manat";
-  }
-
   return result.trim();
+}
+
+/** Convert a number to Azerbaijani currency words: "74700" → "yetmiş dörd min yeddi yüz manat" */
+function numToAz(n: number): string {
+  const integer = Math.floor(Math.round(n * 100) / 100);
+  const decimal = Math.round((n - integer) * 100);
+  const words = intToWords(integer);
+  return decimal > 0 ? `${words} manat ${decimal} qəpik` : `${words} manat`;
 }
 
 function formatCurr(n: number): string {
