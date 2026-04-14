@@ -10,7 +10,8 @@ export const installmentsTable = pgTable("installments", {
   dueDate: timestamp("due_date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   paidDate: timestamp("paid_date"),
-  status: text("status", { enum: ["pending", "paid", "overdue"] }).notNull().default("pending"),
+  paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: text("status", { enum: ["pending", "paid", "overdue", "partial"] }).notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

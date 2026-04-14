@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { installmentsTable, salesTable, customersTable, apartmentsTable, objectsTable, blocksTable } from "@workspace/db/schema";
-import { eq, and, lte } from "drizzle-orm";
+import { eq, and, lte, or } from "drizzle-orm";
 
 const router = Router();
 
@@ -23,12 +23,13 @@ async function getAssetDescription(assetType: string, assetId: number): Promise<
 router.get("/", async (req, res) => {
   const { saleId, status, overdue } = req.query;
 
+  // Mark past-due pending/partial installments as overdue
   await db
     .update(installmentsTable)
     .set({ status: "overdue" })
     .where(
       and(
-        eq(installmentsTable.status, "pending"),
+        or(eq(installmentsTable.status, "pending"), eq(installmentsTable.status, "partial")),
         lte(installmentsTable.dueDate, new Date())
       )
     );
@@ -39,6 +40,7 @@ router.get("/", async (req, res) => {
       saleId: installmentsTable.saleId,
       installmentNumber: installmentsTable.installmentNumber,
       amount: installmentsTable.amount,
+      paidAmount: installmentsTable.paidAmount,
       dueDate: installmentsTable.dueDate,
       paidDate: installmentsTable.paidDate,
       status: installmentsTable.status,
@@ -66,7 +68,6 @@ router.get("/", async (req, res) => {
 
   const installments = await query.orderBy(installmentsTable.dueDate);
 
-  // Build asset descriptions for unique sales
   const assetDescriptions: Record<string, string> = {};
   for (const inst of installments) {
     const key = `${inst.saleAssetType}-${inst.saleAssetId}`;
@@ -78,11 +79,15 @@ router.get("/", async (req, res) => {
   res.json(
     installments.map((inst) => {
       const assetKey = `${inst.saleAssetType}-${inst.saleAssetId}`;
+      const amount = Number(inst.amount);
+      const paidAmt = Number(inst.paidAmount ?? 0);
       return {
         id: inst.id,
         saleId: inst.saleId,
         installmentNumber: inst.installmentNumber,
-        amount: Number(inst.amount),
+        amount,
+        paidAmount: paidAmt,
+        remainingAmount: Math.max(0, amount - paidAmt),
         dueDate: inst.dueDate.toISOString(),
         paidDate: inst.paidDate?.toISOString() ?? null,
         status: inst.status,
@@ -96,11 +101,119 @@ router.get("/", async (req, res) => {
   );
 });
 
+// Bulk payment — distributes payment amount across pending/partial installments in order
+router.post("/bulk-pay", async (req, res) => {
+  const { saleId, paymentAmount, paymentDate } = req.body;
+  if (!saleId || !paymentAmount || paymentAmount <= 0) {
+    return res.status(400).json({ error: "saleId və paymentAmount tələb olunur" });
+  }
+
+  const paidAt = paymentDate ? new Date(paymentDate) : new Date();
+  let remaining = Number(paymentAmount);
+
+  // Get all unpaid/partial installments for this sale, ordered by due date
+  const pending = await db
+    .select()
+    .from(installmentsTable)
+    .where(
+      and(
+        eq(installmentsTable.saleId, Number(saleId)),
+        or(
+          eq(installmentsTable.status, "pending"),
+          eq(installmentsTable.status, "overdue"),
+          eq(installmentsTable.status, "partial")
+        )
+      )
+    )
+    .orderBy(installmentsTable.dueDate);
+
+  const updatedIds: number[] = [];
+
+  for (const inst of pending) {
+    if (remaining <= 0) break;
+
+    const instAmount = Number(inst.amount);
+    const alreadyPaid = Number(inst.paidAmount ?? 0);
+    const needsToPay = instAmount - alreadyPaid;
+
+    if (needsToPay <= 0) continue;
+
+    const toApply = Math.min(remaining, needsToPay);
+    const newPaidAmount = alreadyPaid + toApply;
+    remaining = Math.round((remaining - toApply) * 100) / 100;
+
+    const isFullyPaid = newPaidAmount >= instAmount - 0.01;
+    const newStatus = isFullyPaid ? "paid" : "partial";
+
+    await db
+      .update(installmentsTable)
+      .set({
+        paidAmount: String(Math.round(newPaidAmount * 100) / 100),
+        status: newStatus,
+        paidDate: isFullyPaid ? paidAt : inst.paidDate,
+      })
+      .where(eq(installmentsTable.id, inst.id));
+
+    updatedIds.push(inst.id);
+  }
+
+  // Return all installments for this sale (refreshed)
+  const [saleRow] = await db
+    .select({ assetType: salesTable.assetType, assetId: salesTable.assetId, customerId: salesTable.customerId, monthlyPayment: salesTable.monthlyPayment })
+    .from(salesTable).where(eq(salesTable.id, Number(saleId))).limit(1);
+
+  let customerName = "—";
+  let assetDescription = "—";
+  let monthlyPayment = 0;
+
+  if (saleRow) {
+    monthlyPayment = Number(saleRow.monthlyPayment);
+    assetDescription = await getAssetDescription(saleRow.assetType, saleRow.assetId);
+    const [cust] = await db.select().from(customersTable).where(eq(customersTable.id, saleRow.customerId)).limit(1);
+    if (cust) customerName = `${cust.firstName} ${cust.lastName}`;
+  }
+
+  const allInstallments = await db
+    .select()
+    .from(installmentsTable)
+    .where(eq(installmentsTable.saleId, Number(saleId)))
+    .orderBy(installmentsTable.dueDate);
+
+  res.json({
+    appliedAmount: Number(paymentAmount) - remaining,
+    remainingBalance: remaining,
+    updatedCount: updatedIds.length,
+    installments: allInstallments.map(inst => {
+      const amount = Number(inst.amount);
+      const paidAmt = Number(inst.paidAmount ?? 0);
+      return {
+        id: inst.id,
+        saleId: inst.saleId,
+        installmentNumber: inst.installmentNumber,
+        amount,
+        paidAmount: paidAmt,
+        remainingAmount: Math.max(0, amount - paidAmt),
+        dueDate: inst.dueDate.toISOString(),
+        paidDate: inst.paidDate?.toISOString() ?? null,
+        status: inst.status,
+        customerName,
+        assetDescription,
+        monthlyPayment,
+      };
+    }),
+  });
+});
+
+// Single installment pay (legacy, kept for compatibility)
 router.post("/:id/pay", async (req, res) => {
   const { paidDate } = req.body;
   const [updated] = await db
     .update(installmentsTable)
-    .set({ status: "paid", paidDate: new Date(paidDate) })
+    .set({
+      status: "paid",
+      paidDate: new Date(paidDate),
+      paidAmount: installmentsTable.amount,
+    })
     .where(eq(installmentsTable.id, Number(req.params.id)))
     .returning();
 
@@ -123,11 +236,14 @@ router.post("/:id/pay", async (req, res) => {
     if (cust) customerName = `${cust.firstName} ${cust.lastName}`;
   }
 
+  const amount = Number(updated.amount);
   res.json({
     id: updated.id,
     saleId: updated.saleId,
     installmentNumber: updated.installmentNumber,
-    amount: Number(updated.amount),
+    amount,
+    paidAmount: amount,
+    remainingAmount: 0,
     dueDate: updated.dueDate.toISOString(),
     paidDate: updated.paidDate?.toISOString() ?? null,
     status: updated.status,
