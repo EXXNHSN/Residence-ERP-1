@@ -203,7 +203,7 @@ router.get("/:saleId", async (req, res) => {
   }
 
   // ── 5. Build data variables
-  const contractDate = formatDateAz(new Date(sale.createdAt));
+  const contractDate = formatDateAz(new Date(sale.saleDate));
   const buyerFullName = [customer.lastName, customer.firstName, customer.fatherName].filter(Boolean).join(" ");
   const idCard = customer.idCardNumber ?? "_______________";
   const fin = customer.fin ?? "_______";
@@ -219,8 +219,7 @@ router.get("/:saleId", async (req, res) => {
   const finalPayDate = lastInstDate ? formatDateAz(lastInstDate) : "________________";
 
   // ── 6. Build start date of installments (sale date)
-  const saleDate = new Date(sale.createdAt);
-  const installStartDate = formatDateAz(saleDate);
+  const installStartDate = formatDateAz(new Date(sale.saleDate));
 
   // ── 7. Helper for amount display: "1500 (min beş yüz) AZN"
   const amt = (n: number) => `${n.toLocaleString("az-AZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${numToAz(n)}) AZN`;
