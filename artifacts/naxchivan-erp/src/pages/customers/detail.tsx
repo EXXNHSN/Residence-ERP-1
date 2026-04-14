@@ -16,7 +16,7 @@ import {
   Home, Car, Store, ParkingCircle, Building2,
   ChevronDown, ChevronUp, ShoppingBag, CalendarDays,
   Key, Banknote, TrendingUp, MapPinned, FileText, Receipt,
-  Ruler, CreditCard,
+  Ruler, CreditCard, FileDown,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
@@ -169,6 +169,40 @@ function SaleCard({ sale }: { sale: any }) {
             </TooltipTrigger>
             <TooltipContent>Maliyyə detalları</TooltipContent>
           </Tooltip>
+          {isApt && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = sessionStorage.getItem("naxchivan_erp_token");
+                      const res = await fetch(`${BASE()}/api/contracts/${sale.id}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      if (!res.ok) throw new Error("Müqavilə yaradıla bilmədi");
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      const cd = res.headers.get("Content-Disposition") ?? "";
+                      const match = cd.match(/filename="(.+?)"/);
+                      a.download = match ? decodeURIComponent(match[1]) : `muqavile-${sale.id}.docx`;
+                      a.href = url;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    } catch (err) {
+                      alert(String(err));
+                    }
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border transition-colors bg-muted border-transparent hover:border-blue-400 text-muted-foreground hover:text-blue-600"
+                >
+                  <FileDown className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Müqaviləni yüklə (.docx)</TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
 
