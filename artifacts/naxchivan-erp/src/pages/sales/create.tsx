@@ -665,8 +665,8 @@ export default function CreateSalePage() {
                   </>
                 )}
 
-                {/* ƏDV section — apartments only */}
-                {watchAssetType === 'apartment' && calcResult.total > 0 && (
+                {/* ƏDV section — apartments and objects */}
+                {(watchAssetType === 'apartment' || watchAssetType === 'object') && calcResult.total > 0 && (
                   <div className="pt-4 border-t border-border/50 space-y-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Receipt className="w-4 h-4 text-amber-600" />
@@ -677,7 +677,7 @@ export default function CreateSalePage() {
                         <span className="text-muted-foreground">Şirkət ƏDV (18%)</span>
                         <span className="font-bold text-amber-700">{formatCurrency(calcResult.total * 0.18)}</span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground leading-snug">Mənzil dəyərinin 18%-i şirkətin ƏDV hesabına köçürülür.</p>
+                      <p className="text-[10px] text-muted-foreground leading-snug">Satış dəyərinin 18%-i şirkətin ƏDV hesabına köçürülür.</p>
                     </div>
                     {watchSaleType === 'cash' && (
                       <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200 space-y-2.5">

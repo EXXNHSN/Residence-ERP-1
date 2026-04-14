@@ -77,8 +77,9 @@ function SaleCard({ sale }: { sale: any }) {
   const [showFinance, setShowFinance] = useState(false);
 
   const isApt = sale.assetType === "apartment";
-  const vatAmount = isApt ? sale.totalAmount * 0.18 : 0;
-  const vatRefund = isApt && sale.saleType === "cash" ? vatAmount * 0.30 : 0;
+  const isVatApplicable = sale.assetType === "apartment" || sale.assetType === "object";
+  const vatAmount = isVatApplicable ? sale.totalAmount * 0.18 : 0;
+  const vatRefund = isVatApplicable && sale.saleType === "cash" ? vatAmount * 0.30 : 0;
 
   return (
     <div className="rounded-2xl border border-border/60 bg-background overflow-hidden">
@@ -210,8 +211,8 @@ function SaleCard({ sale }: { sale: any }) {
             </div>
           </div>
 
-          {/* ƏDV section — apartments only */}
-          {isApt && sale.totalAmount > 0 && (
+          {/* ƏDV section — apartments and objects */}
+          {isVatApplicable && sale.totalAmount > 0 && (
             <div className="space-y-2 pt-2 border-t border-emerald-200/60">
               <div className="flex items-center gap-1.5 mb-1">
                 <Receipt className="w-3.5 h-3.5 text-amber-600" />
