@@ -70,8 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearAuth = useCallback(() => {
     setUser(null);
     _currentToken = null;
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
   }, []);
 
   // Register 401 handler so the patched fetch can trigger logout
@@ -80,10 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { _onUnauthorized = null; };
   }, [clearAuth]);
 
+  // On startup: clear any old localStorage tokens (migration from old behavior)
+  useEffect(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }, []);
+
   // On startup: restore stored token and verify it with the server
   useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_KEY);
-    const storedUser = localStorage.getItem(USER_KEY);
+    const storedToken = sessionStorage.getItem(TOKEN_KEY);
+    const storedUser = sessionStorage.getItem(USER_KEY);
 
     if (!storedToken || !storedUser) {
       setIsLoading(false);
@@ -100,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) throw new Error("Token bitib");
         const data: AuthUser = await res.json();
         setUser(data);
-        localStorage.setItem(USER_KEY, JSON.stringify(data));
+        sessionStorage.setItem(USER_KEY, JSON.stringify(data));
       })
       .catch(() => clearAuth())
       .finally(() => setIsLoading(false));
@@ -121,8 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data: { token: string; user: AuthUser } = await res.json();
     _currentToken = data.token;
     setUser(data.user);
-    localStorage.setItem(TOKEN_KEY, data.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    sessionStorage.setItem(TOKEN_KEY, data.token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
   };
 
   const logout = useCallback(() => clearAuth(), [clearAuth]);
