@@ -32,3 +32,6 @@ channel = "stable-25_05"
 
 [userenv.shared]
 JWT_SECRET = "33324688990393cf76efa6386b15ecb3c47838adadf30e97e6bda56d7087045147af0c62a1d9faa5a6cb6c45f9256878"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-92dde36a-f8c9-42d8-8da0-92a8a4812be1"
