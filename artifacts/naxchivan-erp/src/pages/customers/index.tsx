@@ -85,6 +85,7 @@ export default function CustomersPage() {
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
+  const [editFatherName, setEditFatherName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editFin, setEditFin] = useState("");
   const [editFinError, setEditFinError] = useState<string | null>(null);
@@ -111,7 +112,7 @@ export default function CustomersPage() {
   });
 
   const { register, handleSubmit, reset, formState: { errors }, watch, setError } = useForm({
-    defaultValues: { firstName: "", lastName: "", fin: "", phone: "", address: "" }
+    defaultValues: { firstName: "", lastName: "", fatherName: "", fin: "", phone: "", address: "" }
   });
 
   const onSubmit = (data: any) => {
@@ -120,6 +121,7 @@ export default function CustomersPage() {
     createCustomer({
       data: {
         ...data,
+        fatherName: data.fatherName?.trim() || null,
         fin: data.fin?.trim().toUpperCase() || null,
         idCardType: createIdCardType || null,
         idCardNumber: createIdCardNumber?.trim() || null,
@@ -131,6 +133,7 @@ export default function CustomersPage() {
     setEditingCustomer(cust);
     setEditFirstName(cust.firstName);
     setEditLastName(cust.lastName);
+    setEditFatherName(cust.fatherName ?? "");
     setEditPhone(cust.phone);
     setEditFin(cust.fin ?? "");
     setEditFinError(null);
@@ -160,7 +163,9 @@ export default function CustomersPage() {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: user?.username, password: adminPassword,
-        firstName: editFirstName, lastName: editLastName, phone: editPhone,
+        firstName: editFirstName, lastName: editLastName,
+        fatherName: editFatherName?.trim() || null,
+        phone: editPhone,
         fin: editFin?.trim().toUpperCase() || null, address: editAddress,
         idCardType: editIdCardType || null,
         idCardNumber: editIdCardNumber?.trim() || null,
@@ -223,6 +228,11 @@ export default function CustomersPage() {
                         <Input {...register("lastName", { required: "Tələb olunur" })} className="rounded-xl h-11" />
                         {errors.lastName && <p className="text-xs text-destructive">{errors.lastName.message as string}</p>}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Ata adı</label>
+                      <Input {...register("fatherName")} className="rounded-xl h-11" placeholder="Ata adını daxil edin" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -433,6 +443,10 @@ export default function CustomersPage() {
                   <label className="text-sm font-medium">Soyad</label>
                   <Input value={editLastName} onChange={e => setEditLastName(e.target.value)} className="rounded-xl h-11" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Ata adı</label>
+                <Input value={editFatherName} onChange={e => setEditFatherName(e.target.value)} className="rounded-xl h-11" placeholder="Ata adını daxil edin" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">

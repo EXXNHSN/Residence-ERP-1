@@ -249,6 +249,7 @@ export default function CustomerDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
+  const [editFatherName, setEditFatherName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editFin, setEditFin] = useState("");
   const [editAddress, setEditAddress] = useState("");
@@ -257,6 +258,7 @@ export default function CustomerDetailPage() {
     if (!customer) return;
     setEditFirstName(customer.firstName);
     setEditLastName(customer.lastName);
+    setEditFatherName((customer as any).fatherName ?? "");
     setEditPhone(customer.phone);
     setEditFin(customer.fin ?? "");
     setEditAddress(customer.address ?? "");
@@ -268,7 +270,9 @@ export default function CustomerDetailPage() {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: user?.username, password: adminPassword,
-        firstName: editFirstName, lastName: editLastName, phone: editPhone,
+        firstName: editFirstName, lastName: editLastName,
+        fatherName: editFatherName?.trim() || null,
+        phone: editPhone,
         fin: editFin?.trim().toUpperCase() || null, address: editAddress,
       }),
     });
@@ -325,6 +329,9 @@ export default function CustomerDetailPage() {
                       {customer.firstName[0]}{customer.lastName[0]}
                     </div>
                     <h2 className="text-xl font-bold leading-tight">{customer.firstName} {customer.lastName}</h2>
+                    {(customer as any).fatherName && (
+                      <p className="text-sm text-muted-foreground mt-0.5">{(customer as any).fatherName} oğlu/qızı</p>
+                    )}
                     <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
                       <Phone className="w-3 h-3" /> {customer.phone}
                     </p>
@@ -492,6 +499,10 @@ export default function CustomerDetailPage() {
                 <label className="text-sm font-medium">Soyad</label>
                 <Input value={editLastName} onChange={e => setEditLastName(e.target.value)} className="rounded-xl h-11" />
               </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ata adı</label>
+              <Input value={editFatherName} onChange={e => setEditFatherName(e.target.value)} className="rounded-xl h-11" placeholder="Ata adını daxil edin" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
