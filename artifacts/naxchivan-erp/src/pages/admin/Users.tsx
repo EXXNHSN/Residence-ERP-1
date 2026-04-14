@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Trash2, User, Shield, UserCheck } from "lucide-react";
+import { PlusCircle, Trash2, Shield, UserCheck, KeyRound } from "lucide-react";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -30,6 +30,10 @@ export default function AdminUsersPage() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ username: "", password: "", fullName: "", role: "sales" as "admin" | "sales" });
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwTarget, setPwTarget] = useState<UserRecord | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const { data: users = [] } = useQuery<UserRecord[]>({
     queryKey: ["auth-users"],
@@ -68,6 +72,49 @@ export default function AdminUsersPage() {
     },
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: number; password: string }) => {
+      const res = await fetch(`${BASE()}/api/auth/users/${id}/password`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Xəta baş verdi");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setPwOpen(false);
+      setPwTarget(null);
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({ title: "Şifrə uğurla dəyişdirildi" });
+    },
+    onError: (e: any) => toast({ title: "Xəta", description: e.message, variant: "destructive" }),
+  });
+
+  function openPasswordDialog(u: UserRecord) {
+    setPwTarget(u);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPwOpen(true);
+  }
+
+  function handleChangePassword() {
+    if (!pwTarget) return;
+    if (newPassword.length < 6) {
+      toast({ title: "Xəta", description: "Şifrə ən az 6 simvol olmalıdır", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Xəta", description: "Şifrələr uyğun gəlmir", variant: "destructive" });
+      return;
+    }
+    changePasswordMutation.mutate({ id: pwTarget.id, password: newPassword });
+  }
+
   if (!isAdmin) {
     return <div className="p-8 text-center text-muted-foreground">Bu səhifəyə yalnız admin daxil ola bilər.</div>;
   }
@@ -102,6 +149,15 @@ export default function AdminUsersPage() {
               <Badge variant={u.role === "admin" ? "default" : "secondary"}>
                 {u.role === "admin" ? "Admin" : "Satış"}
               </Badge>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => openPasswordDialog(u)}
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                title="Şifrəni dəyiş"
+              >
+                <KeyRound className="w-4 h-4" />
+              </Button>
               {u.id !== currentUser?.id && (
                 <Button
                   size="icon"
@@ -120,6 +176,52 @@ export default function AdminUsersPage() {
         )}
       </div>
 
+      {/* Password change dialog */}
+      <Dialog open={pwOpen} onOpenChange={setPwOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-amber-600" />
+              Şifrəni Dəyiş — <span className="text-primary">@{pwTarget?.username}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Yeni Şifrə</label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="En az 6 simvol"
+                className="rounded-xl h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Şifrəni Təsdiqlə</label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Eyni şifrəni daxil edin"
+                className="rounded-xl h-11"
+                onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
+              />
+              {confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-xs text-destructive">Şifrələr uyğun gəlmir</p>
+              )}
+            </div>
+            <Button
+              className="w-full h-11 rounded-xl"
+              onClick={handleChangePassword}
+              disabled={changePasswordMutation.isPending || !newPassword || !confirmPassword}
+            >
+              {changePasswordMutation.isPending ? "Saxlanılır..." : "Şifrəni Dəyiş"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New user dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
