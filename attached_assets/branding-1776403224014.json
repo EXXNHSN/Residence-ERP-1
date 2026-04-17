@@ -1,0 +1,120 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "DM Sans",
+      "role": "body"
+    },
+    {
+      "family": "Outfit",
+      "role": "heading"
+    }
+  ],
+  "colors": {
+    "primary": "#90A1B9",
+    "accent": "#2463EB",
+    "background": "#FCFCFD",
+    "textPrimary": "#2463EB",
+    "link": "#2463EB"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "DM Sans",
+      "heading": "Outfit"
+    },
+    "fontStacks": {
+      "heading": [
+        "Outfit",
+        "sans-serif"
+      ],
+      "body": [
+        "DM Sans",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "DM Sans",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "30px",
+      "h2": "30px",
+      "body": "16px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 8,
+    "borderRadius": "4px"
+  },
+  "components": {
+    "input": {
+      "background": "#FCFCFD",
+      "textColor": "#FFFFFF",
+      "borderColor": "#FDFDFD",
+      "borderRadius": "16px",
+      "borderRadiusCorners": {
+        "topLeft": "16px",
+        "topRight": "16px",
+        "bottomRight": "16px",
+        "bottomLeft": "16px"
+      },
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+    },
+    "buttonPrimary": {
+      "background": "#2463EB",
+      "textColor": "#F8FAFC",
+      "borderColor": "#E1E7EF",
+      "borderRadius": "16px",
+      "borderRadiusCorners": {
+        "topLeft": "16px",
+        "topRight": "16px",
+        "bottomRight": "16px",
+        "bottomLeft": "16px"
+      },
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.544858 -0.027195 -0.213637 / 0.3) 0px 10px 15px -3px, oklab(0.544858 -0.027195 -0.213637 / 0.3) 0px 4px 6px -4px"
+    }
+  },
+  "images": {
+    "logo": null,
+    "favicon": "https://residence-erp-1.replit.app/favicon.svg",
+    "ogImage": null
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 0,
+      "text": "Daxil ol",
+      "reasoning": "The button with text 'Daxil ol' has a vibrant blue background (#2463EB), which is a strong indicator of a primary call-to-action. The color is vibrant and stands out against the background, making it the most likely candidate for the primary CTA."
+    },
+    "secondary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "There is only one button detected, so no secondary button with a different background color is available."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "medium",
+    "targetAudience": "business professionals"
+  },
+  "designSystem": {
+    "framework": "tailwind",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": false,
+      "llmSucceeded": false,
+      "finalSource": "none"
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}
