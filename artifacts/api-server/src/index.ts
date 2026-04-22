@@ -1,3 +1,4 @@
+import "dotenv/config";
 import app from "./app";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";

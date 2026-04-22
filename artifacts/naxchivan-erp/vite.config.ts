@@ -66,6 +66,16 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // Local dev proxy (Replit ignores — its own proxy handles /api routing).
+    // Set API_PROXY_URL in .env to override default.
+    proxy: !process.env.REPL_ID
+      ? {
+          "/api": {
+            target: process.env.API_PROXY_URL || "http://localhost:8080",
+            changeOrigin: true,
+          },
+        }
+      : undefined,
   },
   preview: {
     port,
