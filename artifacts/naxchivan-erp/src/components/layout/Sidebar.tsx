@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Landmark,
   Handshake,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -153,6 +154,7 @@ export function Sidebar() {
           <div className="space-y-0.5">
             <NavItem item={{ name: "Satışlar", href: "/sales", icon: CreditCard }} location={location} />
             <NavItem item={{ name: "Ödənişlər", href: "/installments", icon: CalendarDays }} location={location} />
+            <NavItem item={{ name: "Bank İdxalı", href: "/bank-import", icon: Upload }} location={location} />
             <NavItem item={{ name: "İcarə", href: "/rentals", icon: Key }} location={location} />
           </div>
         </div>

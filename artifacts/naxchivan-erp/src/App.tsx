@@ -17,6 +17,7 @@ import SalesPage from "@/pages/sales/index";
 import CreateSalePage from "@/pages/sales/create";
 import CreditReportPage from "@/pages/sales/credits";
 import InstallmentsPage from "@/pages/installments/index";
+import BankImportPage from "@/pages/bank-import/index";
 import GaragesPage from "@/pages/garages/index";
 import RentalsPage from "@/pages/rentals/index";
 import RentersPage from "@/pages/renters/index";
@@ -56,6 +57,7 @@ function AppRoutes() {
           <Route path="/sales/create" component={CreateSalePage} />
           <Route path="/sales/credits" component={CreditReportPage} />
           <Route path="/installments" component={InstallmentsPage} />
+          <Route path="/bank-import" component={BankImportPage} />
           <Route path="/garages" component={GaragesPage} />
           <Route path="/rentals" component={RentalsPage} />
           <Route path="/communal" component={CommunalPage} />

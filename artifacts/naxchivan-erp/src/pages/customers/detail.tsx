@@ -134,6 +134,14 @@ function SaleCard({ sale }: { sale: any }) {
             </div>
           )}
 
+          {/* Qaime number */}
+          {sale.qaimeNumber && (
+            <div className="flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2.5 py-1 w-fit" title="Bank ödənişləri üçün qaimə nömrəsi">
+              <Banknote className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="text-xs font-mono font-semibold text-emerald-700 select-all">Qaimə: {sale.qaimeNumber}</span>
+            </div>
+          )}
+
           {/* Payment code */}
           {sale.paymentCode && (
             <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-2.5 py-1 w-fit">

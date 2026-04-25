@@ -72,6 +72,7 @@ async function enrichSale(sale: typeof salesTable.$inferSelect) {
     monthlyPayment: Number(sale.monthlyPayment),
     pricePerSqm: sale.pricePerSqm ? Number(sale.pricePerSqm) : null,
     contractNumber: sale.contractNumber ?? null,
+    qaimeNumber: sale.qaimeNumber ?? null,
     paidAmount: totalPaid,
     remainingAmount: remaining,
     saleDate: sale.saleDate.toISOString(),
@@ -111,7 +112,7 @@ router.post("/calculate", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { customerId, assetType, assetId, saleType, downPayment, installmentMonths, pricePerSqm, totalAmountOverride, contractNumber } = req.body;
+  const { customerId, assetType, assetId, saleType, downPayment, installmentMonths, pricePerSqm, totalAmountOverride, contractNumber, qaimeNumber } = req.body;
 
   const asset = await getAssetInfo(assetType, assetId);
 
@@ -144,6 +145,7 @@ router.post("/", async (req, res) => {
       monthlyPayment: String(monthlyPayment),
       pricePerSqm: pricePerSqm ? String(pricePerSqm) : null,
       contractNumber: contractNumber?.trim() || null,
+      qaimeNumber: qaimeNumber?.trim() || null,
       saleDate: new Date(),
     })
     .returning();
@@ -246,7 +248,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { username, password, pricePerSqm, downPayment, installmentMonths, saleDate } = req.body ?? {};
+  const { username, password, pricePerSqm, downPayment, installmentMonths, saleDate, qaimeNumber, contractNumber } = req.body ?? {};
   if (!(await verifyAdmin(username, password, res))) return;
 
   const saleId = Number(req.params.id);
@@ -282,6 +284,16 @@ router.put("/:id", async (req, res) => {
 
   if (saleDate !== undefined) {
     updates.saleDate = new Date(saleDate);
+  }
+
+  if (qaimeNumber !== undefined) {
+    const trimmed = String(qaimeNumber).trim();
+    updates.qaimeNumber = trimmed || null;
+  }
+
+  if (contractNumber !== undefined) {
+    const trimmed = String(contractNumber).trim();
+    updates.contractNumber = trimmed || null;
   }
 
   if (Object.keys(updates).length === 0) {

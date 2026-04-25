@@ -245,6 +245,7 @@ export default function CreateSalePage() {
           downPayment: data.saleType === 'credit' ? Number(data.downPayment) : 0,
           installmentMonths: data.saleType === 'credit' ? Number(data.installmentMonths) : undefined,
           contractNumber: data.contractNumber?.trim() || undefined,
+          qaimeNumber: data.qaimeNumber?.trim() || undefined,
           ...(isGarage ? { totalAmountOverride: calcResult.total } : {}),
         } as any
       });
@@ -610,12 +611,21 @@ export default function CreateSalePage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                    Müqavilə Nömrəsi
-                  </label>
-                  <Input {...register("contractNumber")} placeholder="M-2024-001" className="rounded-xl h-12 bg-slate-50" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                      Müqavilə Nömrəsi
+                    </label>
+                    <Input {...register("contractNumber")} placeholder="M-2024-001" className="rounded-xl h-12 bg-slate-50" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                      Qaimə Nömrəsi
+                    </label>
+                    <Input {...register("qaimeNumber")} placeholder="Q-2024-001" className="rounded-xl h-12 bg-slate-50" />
+                  </div>
                 </div>
 
                 {watchSaleType === 'credit' && (

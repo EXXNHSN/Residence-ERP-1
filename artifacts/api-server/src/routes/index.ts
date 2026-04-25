@@ -19,6 +19,7 @@ import adminRouter from "./admin";
 import floorPriceTiersRouter from "./floor_price_tiers";
 import rentersRouter from "./renters";
 import contractsRouter from "./contracts";
+import bankImportRouter from "./bank-import";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -47,5 +48,6 @@ router.use("/admin", adminRouter);
 router.use("/floor-price-tiers", floorPriceTiersRouter);
 router.use("/renters", rentersRouter);
 router.use("/contracts", contractsRouter);
+router.use("/bank-import", bankImportRouter);
 
 export default router;
