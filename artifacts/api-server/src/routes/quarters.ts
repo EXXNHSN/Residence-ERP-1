@@ -33,37 +33,40 @@ router.post("/", async (req, res) => {
   res.status(201).json({ ...quarter, buildingCount: 0, apartmentCount: 0 });
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req, res): Promise<void> => {
   const { username, password, name, description } = req.body ?? {};
   const { verifyAdmin } = await import("./adminVerify");
   if (!(await verifyAdmin(username, password, res))) return;
-  if (!name?.trim()) return res.status(400).json({ error: "Ad boş ola bilməz" });
+  if (!name?.trim()) { res.status(400).json({ error: "Ad boş ola bilməz" }); return; }
   const [updated] = await db
     .update(quartersTable)
     .set({ name: name.trim(), description: description ?? null })
     .where(eq(quartersTable.id, Number(req.params.id)))
     .returning();
-  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  if (!updated) { res.status(404).json({ error: "Tapılmadı" }); return; }
   res.json(updated);
 });
 
 // Cascade delete: apartments → blocks → buildings → quarter
 // Requires password confirmation in request body
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req, res): Promise<void> => {
   const { username, password } = req.body ?? {};
 
   if (!username || !password) {
-    return res.status(401).json({ error: "İstifadəçi adı və şifrə tələb olunur" });
+    res.status(401).json({ error: "İstifadəçi adı və şifrə tələb olunur" });
+    return;
   }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
   if (!user || user.role !== "admin") {
-    return res.status(403).json({ error: "Yalnız admin bu əməliyyatı edə bilər" });
+    res.status(403).json({ error: "Yalnız admin bu əməliyyatı edə bilər" });
+    return;
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    return res.status(401).json({ error: "Şifrə yanlışdır" });
+    res.status(401).json({ error: "Şifrə yanlışdır" });
+    return;
   }
 
   const quarterId = Number(req.params.id);

@@ -46,18 +46,18 @@ async function enrichRental(rental: typeof rentalsTable.$inferSelect) {
   };
 }
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res): Promise<void> => {
   const { status } = req.query;
   let query = db.select().from(rentalsTable).$dynamic();
-  if (status) query = query.where(eq(rentalsTable.status, status as string));
+  if (status) query = query.where(eq(rentalsTable.status, status as "active" | "ended"));
 
   const rentals = await query.orderBy(rentalsTable.startDate);
   res.json(await Promise.all(rentals.map(enrichRental)));
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res): Promise<void> => {
   const [rental] = await db.select().from(rentalsTable).where(eq(rentalsTable.id, Number(req.params.id))).limit(1);
-  if (!rental) return res.status(404).json({ error: "Tapılmadı" });
+  if (!rental) { res.status(404).json({ error: "Tapılmadı" }); return; }
   const payments = await db.select().from(objectPaymentsTable)
     .where(eq(objectPaymentsTable.rentalId, rental.id))
     .orderBy(objectPaymentsTable.period);
@@ -108,7 +108,7 @@ router.post("/", async (req, res) => {
   res.status(201).json(await enrichRental(rental));
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req, res): Promise<void> => {
   const { status, endDate, contractNumber, tenantName, tenantPhone, tenantFin } = req.body;
   const updates: Partial<typeof rentalsTable.$inferInsert> = {};
   if (status) updates.status = status;
@@ -124,7 +124,7 @@ router.put("/:id", async (req, res) => {
     .where(eq(rentalsTable.id, Number(req.params.id)))
     .returning();
 
-  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  if (!updated) { res.status(404).json({ error: "Tapılmadı" }); return; }
 
   if (status === "ended") {
     await db.update(objectsTable).set({ status: "available" }).where(eq(objectsTable.id, updated.assetId));
@@ -134,12 +134,12 @@ router.put("/:id", async (req, res) => {
 });
 
 // Terminate (end) a rental — admin password required
-router.put("/:id/terminate", async (req, res) => {
+router.put("/:id/terminate", async (req, res): Promise<void> => {
   const { username, password } = req.body;
   if (!(await verifyAdmin(username, password, res))) return;
 
   const [rental] = await db.select().from(rentalsTable).where(eq(rentalsTable.id, Number(req.params.id))).limit(1);
-  if (!rental) return res.status(404).json({ error: "İcarə tapılmadı" });
+  if (!rental) { res.status(404).json({ error: "İcarə tapılmadı" }); return; }
 
   const [updated] = await db
     .update(rentalsTable)
@@ -154,12 +154,12 @@ router.put("/:id/terminate", async (req, res) => {
 });
 
 // Delete a rental — admin password required
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req, res): Promise<void> => {
   const { username, password } = req.body;
   if (!(await verifyAdmin(username, password, res))) return;
 
   const [rental] = await db.select().from(rentalsTable).where(eq(rentalsTable.id, Number(req.params.id))).limit(1);
-  if (!rental) return res.status(404).json({ error: "İcarə tapılmadı" });
+  if (!rental) { res.status(404).json({ error: "İcarə tapılmadı" }); return; }
 
   // Delete all payment records for this rental
   await db.delete(objectPaymentsTable).where(eq(objectPaymentsTable.rentalId, rental.id));

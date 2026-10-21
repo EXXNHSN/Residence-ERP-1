@@ -80,13 +80,13 @@ async function enrichSale(sale: typeof salesTable.$inferSelect) {
   };
 }
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res): Promise<void> => {
   const { customerId, saleType } = req.query;
   let query = db.select().from(salesTable).$dynamic();
 
   const conditions: ReturnType<typeof eq>[] = [];
   if (customerId) conditions.push(eq(salesTable.customerId, Number(customerId)));
-  if (saleType) conditions.push(eq(salesTable.saleType, saleType as string));
+  if (saleType) conditions.push(eq(salesTable.saleType, saleType as "cash" | "credit"));
 
   if (conditions.length) {
     const { and } = await import("drizzle-orm");
@@ -203,13 +203,13 @@ router.post("/", async (req, res) => {
   });
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req, res): Promise<void> => {
   const { username, password } = req.body ?? {};
   if (!(await verifyAdmin(username, password, res))) return;
 
   const saleId = Number(req.params.id);
   const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, saleId)).limit(1);
-  if (!sale) return res.status(404).json({ error: "Satış tapılmadı" });
+  if (!sale) { res.status(404).json({ error: "Satış tapılmadı" }); return; }
 
   // Reset asset status + handedOver for apartments
   if (sale.assetType === "apartment") {
@@ -229,9 +229,9 @@ router.delete("/:id", async (req, res) => {
   res.status(204).send();
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res): Promise<void> => {
   const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, Number(req.params.id)));
-  if (!sale) return res.status(404).json({ error: "Not found" });
+  if (!sale) { res.status(404).json({ error: "Not found" }); return; }
 
   const enriched = await enrichSale(sale);
   const { installments } = await getInstallmentSummary(sale.id);
@@ -247,38 +247,35 @@ router.get("/:id", async (req, res) => {
   });
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req, res): Promise<void> => {
   const { username, password, pricePerSqm, downPayment, installmentMonths, saleDate, qaimeNumber, contractNumber } = req.body ?? {};
   if (!(await verifyAdmin(username, password, res))) return;
 
   const saleId = Number(req.params.id);
   const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, saleId)).limit(1);
-  if (!sale) return res.status(404).json({ error: "Satış tapılmadı" });
+  if (!sale) { res.status(404).json({ error: "Satış tapılmadı" }); return; }
 
   const updates: Partial<typeof salesTable.$inferInsert> = {};
 
   if (pricePerSqm !== undefined) {
     const ppsqm = Number(pricePerSqm);
-    if (isNaN(ppsqm) || ppsqm <= 0) return res.status(400).json({ error: "Qiymət düzgün deyil" });
+    if (isNaN(ppsqm) || ppsqm <= 0) { res.status(400).json({ error: "Qiymət düzgün deyil" }); return; }
     updates.pricePerSqm = String(ppsqm);
 
     const asset = await getAssetInfo(sale.assetType, sale.assetId);
     const newTotal = asset.area * ppsqm;
     updates.totalAmount = String(newTotal);
-    updates.remainingAmount = String(newTotal - Number(sale.downPayment));
   }
 
   if (downPayment !== undefined && sale.saleType === "credit") {
     const dp = Number(downPayment);
-    if (isNaN(dp) || dp < 0) return res.status(400).json({ error: "İlkin ödəniş düzgün deyil" });
+    if (isNaN(dp) || dp < 0) { res.status(400).json({ error: "İlkin ödəniş düzgün deyil" }); return; }
     updates.downPayment = String(dp);
-    const total = Number(updates.totalAmount ?? sale.totalAmount);
-    updates.remainingAmount = String(total - dp);
   }
 
   if (installmentMonths !== undefined && sale.saleType === "credit") {
     const months = Number(installmentMonths);
-    if (isNaN(months) || months < 1) return res.status(400).json({ error: "Ay sayı düzgün deyil" });
+    if (isNaN(months) || months < 1) { res.status(400).json({ error: "Ay sayı düzgün deyil" }); return; }
     updates.installmentMonths = months;
   }
 

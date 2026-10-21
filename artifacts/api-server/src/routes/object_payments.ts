@@ -7,7 +7,7 @@ import { verifyAdmin } from "./adminVerify";
 const router = Router();
 
 // Get payments for a rental
-router.get("/rental/:rentalId", async (req, res) => {
+router.get("/rental/:rentalId", async (req, res): Promise<void> => {
   const payments = await db
     .select()
     .from(objectPaymentsTable)
@@ -17,7 +17,7 @@ router.get("/rental/:rentalId", async (req, res) => {
 });
 
 // Mark a payment as paid
-router.put("/:id/pay", async (req, res) => {
+router.put("/:id/pay", async (req, res): Promise<void> => {
   const { paymentDate, note } = req.body ?? {};
   const [updated] = await db
     .update(objectPaymentsTable)
@@ -28,23 +28,23 @@ router.put("/:id/pay", async (req, res) => {
     })
     .where(eq(objectPaymentsTable.id, Number(req.params.id)))
     .returning();
-  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  if (!updated) { res.status(404).json({ error: "Tapılmadı" }); return; }
   res.json(updated);
 });
 
 // Mark a payment as pending (undo pay)
-router.put("/:id/unpay", async (req, res) => {
+router.put("/:id/unpay", async (req, res): Promise<void> => {
   const [updated] = await db
     .update(objectPaymentsTable)
     .set({ status: "pending", paymentDate: null, note: null })
     .where(eq(objectPaymentsTable.id, Number(req.params.id)))
     .returning();
-  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  if (!updated) { res.status(404).json({ error: "Tapılmadı" }); return; }
   res.json(updated);
 });
 
 // Update payment amount (admin only)
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req, res): Promise<void> => {
   const { username, password, amount, note } = req.body ?? {};
   if (!(await verifyAdmin(username, password, res))) return;
   const updates: any = {};
@@ -55,7 +55,7 @@ router.put("/:id", async (req, res) => {
     .set(updates)
     .where(eq(objectPaymentsTable.id, Number(req.params.id)))
     .returning();
-  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  if (!updated) { res.status(404).json({ error: "Tapılmadı" }); return; }
   res.json(updated);
 });
 

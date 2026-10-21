@@ -247,18 +247,21 @@ export default function ObjectsPage() {
             <p className="text-muted-foreground mt-1">Kommersiya, ofis və digər qeyri yaşayış sahələri</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Bulk creation button */}
-            <Button variant="outline" className="rounded-xl border-dashed gap-2"
-              onClick={() => setIsBulkOpen(true)}>
-              <LayoutGrid className="w-4 h-4" /> Toplu Yarat
-            </Button>
-            {/* Single add button */}
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogTrigger asChild>
-                <Button className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-                  <Plus className="w-4 h-4 mr-1.5" /> Tək Əlavə et
-                </Button>
-              </DialogTrigger>
+            {/* Bulk creation button - admin only */}
+            {isAdmin && (
+              <Button variant="outline" className="rounded-xl border-dashed gap-2"
+                onClick={() => setIsBulkOpen(true)}>
+                <LayoutGrid className="w-4 h-4" /> Toplu Yarat
+              </Button>
+            )}
+            {/* Single add button - admin only */}
+            {isAdmin && (
+              <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                <DialogTrigger asChild>
+                  <Button className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
+                    <Plus className="w-4 h-4 mr-1.5" /> Tək Əlavə et
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-md rounded-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-display flex items-center gap-2">
@@ -299,6 +302,7 @@ export default function ObjectsPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
 

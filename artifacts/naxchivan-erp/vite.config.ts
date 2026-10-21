@@ -2,49 +2,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
 
 export default defineConfig({
-  base: basePath,
+  // Base path'i Windows uyumluluğu için "/" olarak sabitledik
+  base: "/", 
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {
@@ -59,27 +23,14 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port,
-    host: "0.0.0.0",
-    allowedHosts: true,
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
+    // Portu 5173 olarak sabitledik, hata verme riskini bitirdik
+    port: 5173,
+    host: "127.0.0.1",
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
     },
-    // Local dev proxy (Replit ignores — its own proxy handles /api routing).
-    // Set API_PROXY_URL in .env to override default.
-    proxy: !process.env.REPL_ID
-      ? {
-          "/api": {
-            target: process.env.API_PROXY_URL || "http://localhost:8080",
-            changeOrigin: true,
-          },
-        }
-      : undefined,
-  },
-  preview: {
-    port,
-    host: "0.0.0.0",
-    allowedHosts: true,
   },
 });

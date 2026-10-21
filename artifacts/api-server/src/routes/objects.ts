@@ -113,13 +113,15 @@ async function attachRentalInfo(objects: Awaited<ReturnType<typeof enrichObject>
         const [cust] = await db.select().from(customersTable).where(eq(customersTable.id, rental.customerId)).limit(1);
         if (cust) tName = `${cust.firstName} ${cust.lastName}`;
       }
-      obj.rentalId = rental.id;
-      obj.tenantName = tName;
-      obj.tenantPhone = rental.tenantPhone ?? null;
-      obj.rentalStart = rental.startDate.toISOString();
-      obj.rentalEnd = rental.endDate.toISOString();
-      obj.monthlyAmount = Number(rental.monthlyAmount);
-      obj.customerId = rental.customerId ?? null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const o = obj as any;
+      o.rentalId = rental.id;
+      o.tenantName = tName;
+      o.tenantPhone = rental.tenantPhone ?? null;
+      o.rentalStart = rental.startDate.toISOString();
+      o.rentalEnd = rental.endDate.toISOString();
+      o.monthlyAmount = Number(rental.monthlyAmount);
+      o.customerId = rental.customerId ?? null;
     }
   }
   return objects;
@@ -128,8 +130,8 @@ async function attachRentalInfo(objects: Awaited<ReturnType<typeof enrichObject>
 router.get("/", async (req, res) => {
   const { type, status, blockId } = req.query;
   const conditions: ReturnType<typeof eq>[] = [];
-  if (type) conditions.push(eq(objectsTable.type, type as string));
-  if (status) conditions.push(eq(objectsTable.status, status as string));
+  if (type) conditions.push(eq(objectsTable.type, type as "object" | "garage"));
+  if (status) conditions.push(eq(objectsTable.status, status as "available" | "sold" | "rented"));
   if (blockId) conditions.push(eq(objectsTable.blockId, Number(blockId)));
 
   const objs = await db
@@ -149,10 +151,11 @@ router.get("/", async (req, res) => {
 });
 
 // Bulk garage setup for a block
-router.post("/garage-setup", async (req, res) => {
+router.post("/garage-setup", async (req, res): Promise<void> => {
   const { blockId, spotsPerFloor, floors } = req.body;
   if (!blockId || !spotsPerFloor) {
-    return res.status(400).json({ error: "blockId and spotsPerFloor are required" });
+    res.status(400).json({ error: "blockId and spotsPerFloor are required" });
+    return;
   }
 
   const numFloors = floors ?? 2;
@@ -160,7 +163,7 @@ router.post("/garage-setup", async (req, res) => {
 
   // Check block exists
   const [block] = await db.select().from(blocksTable).where(eq(blocksTable.id, Number(blockId))).limit(1);
-  if (!block) return res.status(404).json({ error: "Blok tapılmadı" });
+  if (!block) { res.status(404).json({ error: "Blok tapılmadı" }); return; }
 
   const spots: typeof objectsTable.$inferInsert[] = [];
   for (let floor = 1; floor <= numFloors; floor++) {
@@ -233,7 +236,7 @@ router.post("/", async (req, res) => {
   res.status(201).json(await enrichObject(obj, garageFixedPrices, pricePerSqm));
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req, res): Promise<void> => {
   const { username, password, number, area, blockId, activityType, parkingFloor } = req.body ?? {};
   if (!(await verifyAdmin(username, password, res))) return;
 
@@ -250,7 +253,7 @@ router.put("/:id", async (req, res) => {
     .where(eq(objectsTable.id, Number(req.params.id)))
     .returning();
 
-  if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+  if (!updated) { res.status(404).json({ error: "Tapılmadı" }); return; }
   const garageFixedPrices = await getGarageFixedPrices();
   const pricePerSqm = await getPricePerSqm(updated.type);
   res.json(await enrichObject(updated, garageFixedPrices, pricePerSqm));
