@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { ContractDialog } from "@/components/ContractDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCustomerQueryKey } from "@workspace/api-client-react";
@@ -72,12 +73,13 @@ function CollapsibleSection({ icon: Icon, title, count, iconColor, children, def
 }
 
 // ── Single sale card ──────────────────────────────────────────────────────────
-function SaleCard({ sale }: { sale: any }) {
+function SaleCard({ sale, onViewContract }: { sale: any; onViewContract: (saleId: number) => void }) {
   const [showDate, setShowDate] = useState(false);
   const [showFinance, setShowFinance] = useState(false);
 
   const isApt = sale.assetType === "apartment";
-  const isVatApplicable = sale.assetType === "apartment" || sale.assetType === "object";
+  const isObj = sale.assetType === "object";
+  const isVatApplicable = isApt || isObj;
   const vatAmount = isVatApplicable ? sale.totalAmount * 0.18 : 0;
   const vatRefund = isVatApplicable && sale.saleType === "cash" ? vatAmount * 0.30 : 0;
 
@@ -87,11 +89,13 @@ function SaleCard({ sale }: { sale: any }) {
       <div className="flex flex-col sm:flex-row sm:items-start gap-3 p-4">
         {/* Asset icon */}
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-          isApt ? "bg-blue-100" : "bg-indigo-100"
+          isApt ? "bg-blue-100" : isObj ? "bg-emerald-100" : "bg-indigo-100"
         }`}>
           {isApt
             ? <Home className="w-5 h-5 text-blue-600" />
-            : <Car className="w-5 h-5 text-indigo-600" />}
+            : isObj
+              ? <Building2 className="w-5 h-5 text-emerald-600" />
+              : <Car className="w-5 h-5 text-indigo-600" />}
         </div>
 
         {/* Main info */}
@@ -177,38 +181,18 @@ function SaleCard({ sale }: { sale: any }) {
             </TooltipTrigger>
             <TooltipContent>Maliyyə detalları</TooltipContent>
           </Tooltip>
-          {isApt && (
+          {/* Contract view button — for apartments and objects */}
+          {(isApt || isObj) && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={async () => {
-                    try {
-                      const token = sessionStorage.getItem("naxchivan_erp_token");
-                      const res = await fetch(`${BASE()}/api/contracts/${sale.id}`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                      if (!res.ok) throw new Error("Müqavilə yaradıla bilmədi");
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      const cd = res.headers.get("Content-Disposition") ?? "";
-                      const match = cd.match(/filename="(.+?)"/);
-                      a.download = match ? decodeURIComponent(match[1]) : `muqavile-${sale.id}.docx`;
-                      a.href = url;
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      URL.revokeObjectURL(url);
-                    } catch (err) {
-                      alert(String(err));
-                    }
-                  }}
+                  onClick={() => onViewContract(sale.id)}
                   className="w-8 h-8 rounded-lg flex items-center justify-center border transition-colors bg-muted border-transparent hover:border-blue-400 text-muted-foreground hover:text-blue-600"
                 >
                   <FileDown className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Müqaviləni yüklə (.docx)</TooltipContent>
+              <TooltipContent>Müqaviləyə bax / Yüklə</TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -259,16 +243,17 @@ function SaleCard({ sale }: { sale: any }) {
               <div className="flex items-center gap-1.5 mb-1">
                 <Receipt className="w-3.5 h-3.5 text-amber-600" />
                 <span className="text-xs font-semibold text-amber-700">ƏDV Məlumatı</span>
+                <span className="text-[10px] text-muted-foreground">(18%)</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="bg-amber-50 rounded-xl p-2.5 border border-amber-200">
-                  <p className="text-[10px] text-muted-foreground">Şirkət ƏDV (18%)</p>
-                  <p className="font-bold text-amber-700 text-sm mt-0.5">{formatCurrency(vatAmount)}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">ƏDV Məbləği</p>
+                  <p className="font-bold text-amber-700 text-sm">{formatCurrency(vatAmount)}</p>
                 </div>
                 {vatRefund > 0 && (
-                  <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-200">
-                    <p className="text-[10px] text-muted-foreground">Dövlət ƏDV qaytarması (30%×18%)</p>
-                    <p className="font-bold text-emerald-700 text-sm mt-0.5">{formatCurrency(vatRefund)}</p>
+                  <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">İstifadəçi Geri Alacaq (30%)</p>
+                    <p className="font-bold text-emerald-600 text-sm">{formatCurrency(vatRefund)}</p>
                   </div>
                 )}
               </div>
@@ -280,13 +265,12 @@ function SaleCard({ sale }: { sale: any }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { data: customer, isLoading, isError } = useGetCustomer(Number(id));
   const { isAdmin, user } = useAuth();
-  const qc = useQueryClient();
   const { toast } = useToast();
+  const qc = useQueryClient();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
@@ -295,6 +279,7 @@ export default function CustomerDetailPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editFin, setEditFin] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const [contractSaleId, setContractSaleId] = useState<number | null>(null);
 
   function openEdit() {
     if (!customer) return;
@@ -473,7 +458,13 @@ export default function CustomerDetailPage() {
                   <p className="text-center py-8 text-muted-foreground text-sm mt-4">Bu sakinin satınalması yoxdur.</p>
                 ) : (
                   <div className="mt-4 space-y-3">
-                    {sales.map((sale: any) => <SaleCard key={sale.id} sale={sale} />)}
+                    {sales.map((sale: any) => (
+                      <SaleCard
+                        key={sale.id}
+                        sale={sale}
+                        onViewContract={(saleId) => setContractSaleId(saleId)}
+                      />
+                    ))}
                   </div>
                 )}
               </CollapsibleSection>
@@ -527,6 +518,13 @@ export default function CustomerDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Contract Dialog — for apartments and objects */}
+        <ContractDialog
+          saleId={contractSaleId}
+          open={!!contractSaleId}
+          onOpenChange={(v) => !v && setContractSaleId(null)}
+        />
 
         {/* Edit dialog */}
         <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}

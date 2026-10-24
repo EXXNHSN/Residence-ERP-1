@@ -115,6 +115,8 @@ export default function CreateSalePage() {
   const [filterFloors, setFilterFloors] = useState<Set<number>>(new Set());
   const [filterRooms, setFilterRooms] = useState("all");
   const [floorPriceTiers, setFloorPriceTiers] = useState<{ id: number; floorFrom: number; floorTo: number; pricePerSqm: number }[]>([]);
+  // Qeyri-yaşayış üçün xüsusi sahə (m²) — istifadəçi dəyişdirə bilər
+  const [customObjectArea, setCustomObjectArea] = useState("");
 
   const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -260,7 +262,9 @@ export default function CreateSalePage() {
         if (watchAssetType === 'apartment') {
           area = apartments?.find((a: any) => a.id.toString() === watchAssetId)?.area || 0;
         } else {
-          area = objects?.find((o: any) => o.id.toString() === watchAssetId)?.area || 0;
+          // For objects, use custom area if set, otherwise fall back to stored area
+          const storedArea = objects?.find((o: any) => o.id.toString() === watchAssetId)?.area || 0;
+          area = customObjectArea ? Number(customObjectArea) : storedArea;
         }
       }
       const price = Number(watchPrice) || 0;
@@ -273,7 +277,7 @@ export default function CreateSalePage() {
       monthly = (totalAmount - dp) / months;
     }
     setCalcResult({ total: totalAmount, monthly: monthly > 0 ? monthly : 0 });
-  }, [watchAssetType, watchAssetId, watchPrice, watchSaleType, watchDownPayment, watchMonths, apartments, objects]);
+  }, [watchAssetType, watchAssetId, watchPrice, watchSaleType, watchDownPayment, watchMonths, apartments, objects, customObjectArea]);
 
   const onSubmit = async (data: any) => {
     if (isContractDuplicate) {
@@ -315,6 +319,7 @@ export default function CreateSalePage() {
       }
 
       const isGarage = data.assetType === 'garage';
+      const isObject = data.assetType === 'object';
       const effectiveSaleDate = !isAdmin ? todayStr : (data.saleDate || todayStr);
 
       await createSale({
@@ -331,6 +336,8 @@ export default function CreateSalePage() {
           saleDate: new Date(effectiveSaleDate).toISOString(),
           initialPaidAmount: isAdmin && data.saleType === 'credit' && data.initialPaidAmount ? Number(data.initialPaidAmount) : 0,
           ...(isGarage ? { totalAmountOverride: calcResult.total } : {}),
+          // Qeyri-yaşayış üçün xüsusi sahə
+          ...(isObject && customObjectArea ? { customArea: Number(customObjectArea) } : {}),
         } as any
       });
 
@@ -675,6 +682,46 @@ export default function CreateSalePage() {
                           >
                             Dəyiş
                           </button>
+                        </div>
+                      )}
+
+                      {/* Qeyri-yaşayış üçün xüsusi sahə daxiletmə */}
+                      {watchAssetType === 'object' && field.value && (
+                        <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 space-y-2">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700" />
+                            <p className="text-xs font-semibold text-amber-900">Qeyri-yaşayış Sahəsi Tənzimlənməsi</p>
+                          </div>
+                          <p className="text-[11px] text-amber-800 mb-2">
+                            Qeyri-yaşayış sahələri standart deyil — ölçüsünü sahibkarla razılaşdırıb aşağıda daxil edin.
+                            Boş saxlasanız obyektin qeydiyyatdakı sahəsi istifadə olunacaq.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="1"
+                              placeholder={`Default: ${filteredAssets.find((a: any) => a.id.toString() === field.value)?.area || 0} m²`}
+                              value={customObjectArea}
+                              onChange={(e) => setCustomObjectArea(e.target.value)}
+                              className="rounded-xl h-10 bg-white border-amber-300 text-sm flex-1"
+                            />
+                            <span className="text-sm font-medium text-amber-800 shrink-0">m²</span>
+                            {customObjectArea && (
+                              <button
+                                type="button"
+                                onClick={() => setCustomObjectArea("")}
+                                className="text-xs text-amber-700 hover:text-destructive underline shrink-0"
+                              >
+                                Sıfırla
+                              </button>
+                            )}
+                          </div>
+                          {customObjectArea && Number(customObjectArea) > 0 && (
+                            <p className="text-[11px] text-amber-700 font-medium">
+                              Satış hesabı: <strong>{customObjectArea} m²</strong> × qiymət = yekun məbləğ
+                            </p>
+                          )}
                         </div>
                       )}
 
