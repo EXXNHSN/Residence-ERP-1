@@ -6,6 +6,8 @@ import {
   useListBlocks,
   useCreateSale,
   useCreateCustomer,
+  useListCustomers,
+  useListSales,
   useListTariffs,
   SaleType,
   CreateSaleInputAssetType,
@@ -18,11 +20,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, Controller } from "react-hook-form";
 import { useLocation } from "wouter";
-import { Loader2, ArrowLeft, Calculator, User, Search, CheckCircle2, Building2, Layers, SquareStack, X, SlidersHorizontal, Zap, FileText, Receipt } from "lucide-react";
+import { Loader2, ArrowLeft, Calculator, User, CheckCircle2, Building2, X, SlidersHorizontal, Zap, FileText, Receipt, Calendar, AlertTriangle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { IdCardInput, type IdCardType } from "@/components/IdCardInput";
 
 function toRoman(num: number): string {
@@ -55,15 +58,23 @@ export default function CreateSalePage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
+
+  const todayStr = new Date().toISOString().split("T")[0];
 
   const { data: apartments } = useListApartments({ status: ApartmentStatus.available });
   const { data: objects } = useListObjects({ status: ObjectStatus.available });
   const { data: tariffs } = useListTariffs();
   const { data: blocks } = useListBlocks();
+  const { data: customers = [] } = useListCustomers();
+  const { data: sales = [] } = useListSales();
 
   const [saleIdCardType, setSaleIdCardType] = useState<IdCardType>("");
   const [saleIdCardNumber, setSaleIdCardNumber] = useState("");
   const [idCardError, setIdCardError] = useState("");
+
+  // Mövcud sakin (FİN yazıldıqda avtomatik tapılan)
+  const [existingCustomer, setExistingCustomer] = useState<any | null>(null);
 
   const { mutateAsync: createCustomer } = useCreateCustomer();
   const { mutateAsync: createSale, isPending } = useCreateSale();
@@ -80,7 +91,11 @@ export default function CreateSalePage() {
       saleType: SaleType.cash,
       pricePerSqm: "",
       downPayment: "0",
-      installmentMonths: "12"
+      installmentMonths: "12",
+      saleDate: todayStr,
+      initialPaidAmount: "",
+      contractNumber: "",
+      qaimeNumber: ""
     }
   });
 
@@ -90,9 +105,11 @@ export default function CreateSalePage() {
   const watchPrice = watch("pricePerSqm");
   const watchDownPayment = watch("downPayment");
   const watchMonths = watch("installmentMonths");
+  const watchFin = watch("fin");
+  const watchContractNumber = watch("contractNumber");
+  const watchQaimeNumber = watch("qaimeNumber");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [assetSearch, setAssetSearch] = useState("");
   const [filterKvartal, setFilterKvartal] = useState("all");
   const [filterBlock, setFilterBlock] = useState("all");
   const [filterFloors, setFilterFloors] = useState<Set<number>>(new Set());
@@ -107,6 +124,58 @@ export default function CreateSalePage() {
       .then(data => Array.isArray(data) && setFloorPriceTiers(data))
       .catch(() => {});
   }, []);
+
+  // Müqavilə nömrəsinin canlı təkrarolunmazlıq yoxlanışı
+  const isContractDuplicate = useMemo(() => {
+    if (!watchContractNumber?.trim()) return false;
+    const clean = watchContractNumber.trim().toLowerCase();
+    return sales.some((s: any) => s.contractNumber && s.contractNumber.trim().toLowerCase() === clean);
+  }, [watchContractNumber, sales]);
+
+  // Qaimə nömrəsinin canlı təkrarolunmazlıq yoxlanışı
+  const isQaimeDuplicate = useMemo(() => {
+    if (!watchQaimeNumber?.trim()) return false;
+    const clean = watchQaimeNumber.trim().toLowerCase();
+    return sales.some((s: any) => s.qaimeNumber && s.qaimeNumber.trim().toLowerCase() === clean);
+  }, [watchQaimeNumber, sales]);
+
+  // FİN yazıldıqda avtomatik sakini axtar və formu doldur
+  const handleFinChange = (finVal: string) => {
+    setValue("fin", finVal);
+    const cleanFin = finVal.trim().toUpperCase();
+    if (cleanFin.length === 7) {
+      const match = customers.find(c => c.fin && c.fin.toUpperCase() === cleanFin);
+      if (match) {
+        setExistingCustomer(match);
+        setValue("firstName", match.firstName || "");
+        setValue("lastName", match.lastName || "");
+        setValue("phone", match.phone || "");
+        setValue("address", match.address || "");
+        if (match.idCardType) setSaleIdCardType(match.idCardType as IdCardType);
+        if (match.idCardNumber) setSaleIdCardNumber(match.idCardNumber);
+        setIdCardError("");
+        toast({
+          title: "Sakin Tapıldı",
+          description: `${match.firstName} ${match.lastName} məlumatları bazadan gətirildi.`,
+        });
+      } else {
+        setExistingCustomer(null);
+      }
+    } else {
+      if (existingCustomer) setExistingCustomer(null);
+    }
+  };
+
+  const clearExistingCustomer = () => {
+    setExistingCustomer(null);
+    setValue("firstName", "");
+    setValue("lastName", "");
+    setValue("fin", "");
+    setValue("phone", "");
+    setValue("address", "");
+    setSaleIdCardType("");
+    setSaleIdCardNumber("");
+  };
 
   const uniqueKvartals = useMemo(() => {
     if (!blocks) return [];
@@ -138,7 +207,7 @@ export default function CreateSalePage() {
 
   const uniqueRooms = useMemo(() => {
     if (!apartments) return [];
-    return [...new Set(apartments.map((a: any) => a.rooms))].sort((a, b) => a - b);
+    return [...new Set(apartments.map((a: any) => a.rooms))].sort((a: number, b: number) => a - b);
   }, [apartments]);
 
   const toggleFloor = (floor: number) => {
@@ -149,20 +218,18 @@ export default function CreateSalePage() {
     });
   };
 
-  const hasActiveFilters = filterKvartal !== "all" || filterBlock !== "all" || filterFloors.size > 0 || filterRooms !== "all" || assetSearch.trim() !== "";
+  const hasActiveFilters = filterKvartal !== "all" || filterBlock !== "all" || filterFloors.size > 0 || filterRooms !== "all";
 
   const clearAllFilters = () => {
     setFilterKvartal("all");
     setFilterBlock("all");
     setFilterFloors(new Set());
     setFilterRooms("all");
-    setAssetSearch("");
   };
 
   useEffect(() => {
     if (!tariffs || !watchAssetType) return;
     if (watchAssetType === 'garage') {
-      // For garages, use fixed sale price (not area-based)
       setValue('pricePerSqm', ((tariffs as any).garageSalePrice ?? 5000).toString());
       return;
     }
@@ -186,7 +253,6 @@ export default function CreateSalePage() {
   useEffect(() => {
     let totalAmount = 0;
     if (watchAssetType === 'garage') {
-      // Fixed price for garages
       totalAmount = Number(watchPrice) || 0;
     } else {
       let area = 0;
@@ -210,7 +276,15 @@ export default function CreateSalePage() {
   }, [watchAssetType, watchAssetId, watchPrice, watchSaleType, watchDownPayment, watchMonths, apartments, objects]);
 
   const onSubmit = async (data: any) => {
-    // Validate ID card separately (not managed by react-hook-form)
+    if (isContractDuplicate) {
+      toast({ title: "Xəta", description: "Bu müqavilə nömrəsi artıq istifadə olunub!", variant: "destructive" });
+      return;
+    }
+    if (isQaimeDuplicate) {
+      toast({ title: "Xəta", description: "Bu qaimə nömrəsi artıq istifadə olunub!", variant: "destructive" });
+      return;
+    }
+
     if (!saleIdCardType) {
       setIdCardError("Şəxsiyyət vəsiqəsinin növü mütləqdir");
       return;
@@ -221,36 +295,45 @@ export default function CreateSalePage() {
     }
     setIdCardError("");
     setIsSubmitting(true);
+
     try {
-      const customer = await createCustomer({
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          fin: data.fin || undefined,
-          phone: data.phone,
-          address: data.address || undefined,
-          idCardType: saleIdCardType || undefined,
-          idCardNumber: saleIdCardNumber?.trim() || undefined,
-        } as any
-      });
+      let customerId = existingCustomer?.id;
+
+      if (!customerId) {
+        const customer = await createCustomer({
+          data: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            fin: data.fin || undefined,
+            phone: data.phone,
+            address: data.address || undefined,
+            idCardType: saleIdCardType || undefined,
+            idCardNumber: saleIdCardNumber?.trim() || undefined,
+          } as any
+        });
+        customerId = customer.id;
+      }
 
       const isGarage = data.assetType === 'garage';
+      const effectiveSaleDate = !isAdmin ? todayStr : (data.saleDate || todayStr);
+
       await createSale({
         data: {
-          customerId: customer.id,
+          customerId,
           assetType: data.assetType,
           assetId: Number(data.assetId),
           saleType: data.saleType,
           pricePerSqm: isGarage ? 0 : Number(data.pricePerSqm),
           downPayment: data.saleType === 'credit' ? Number(data.downPayment) : 0,
           installmentMonths: data.saleType === 'credit' ? Number(data.installmentMonths) : undefined,
-          contractNumber: data.contractNumber?.trim() || undefined,
-          qaimeNumber: data.qaimeNumber?.trim() || undefined,
+          contractNumber: data.contractNumber?.trim(),
+          qaimeNumber: data.qaimeNumber?.trim(),
+          saleDate: new Date(effectiveSaleDate).toISOString(),
+          initialPaidAmount: isAdmin && data.saleType === 'credit' && data.initialPaidAmount ? Number(data.initialPaidAmount) : 0,
           ...(isGarage ? { totalAmountOverride: calcResult.total } : {}),
         } as any
       });
 
-      // Invalidate all affected caches so lists show fresh data
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/sales"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/customers"] }),
@@ -259,7 +342,10 @@ export default function CreateSalePage() {
         queryClient.invalidateQueries({ queryKey: ["/api/stats/summary"] }),
       ]);
 
-      toast({ title: "Satış uğurla yaradıldı", description: `${data.firstName} ${data.lastName} üçün satış qeydə alındı.` });
+      toast({ 
+        title: "Satış uğurla qeydə alındı", 
+        description: `Müqavilə № ${data.contractNumber} — ${data.firstName} ${data.lastName} üçün tərtib edildi.` 
+      });
       setLocation("/sales");
     } catch (err: any) {
       setIsSubmitting(false);
@@ -286,16 +372,9 @@ export default function CreateSalePage() {
         if (filterFloors.size > 0 && !filterFloors.has(a.floor)) return false;
         if (filterRooms !== 'all' && a.rooms !== Number(filterRooms)) return false;
       }
-      if (assetSearch.trim()) {
-        const q = assetSearch.toLowerCase();
-        const label = watchAssetType === 'apartment'
-          ? `${a.blockName} ${a.number} ${a.floor} ${a.rooms}`.toLowerCase()
-          : `${a.number}`.toLowerCase();
-        if (!label.includes(q)) return false;
-      }
       return true;
     });
-  }, [watchAssetType, apartments, objects, blocks, assetSearch, filterKvartal, filterBlock, filterFloors, filterRooms]);
+  }, [watchAssetType, apartments, objects, blocks, filterKvartal, filterBlock, filterFloors, filterRooms]);
 
   const loading = isPending || isSubmitting;
 
@@ -315,14 +394,33 @@ export default function CreateSalePage() {
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
 
+            {/* Müştəri Məlumatları */}
             <Card className="border-none shadow-lg shadow-black/5">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <User className="w-4 h-4 text-primary" />
                   Müştəri Məlumatları
                 </CardTitle>
+                {existingCustomer && (
+                  <Button type="button" variant="ghost" size="sm" onClick={clearExistingCustomer} className="text-xs text-muted-foreground hover:text-destructive">
+                    <X className="w-3.5 h-3.5 mr-1" /> Təmizlə (Yeni Müştəri)
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="p-6 pt-2 space-y-4">
+
+                {/* Status banner əgər FİN ilə mövcud sakin tapılıbsa */}
+                {existingCustomer && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>
+                        <strong>Qeydiyyatda olan sakin:</strong> {existingCustomer.firstName} {existingCustomer.lastName} (FİN: {existingCustomer.fin}). Məlumatlar bazadan gətirildi.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-sm font-medium">Ad <span className="text-destructive">*</span></label>
@@ -337,6 +435,7 @@ export default function CreateSalePage() {
                     {errors.lastName && <p className="text-xs text-destructive">{errors.lastName.message as string}</p>}
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-sm font-medium">Telefon <span className="text-destructive">*</span></label>
@@ -345,18 +444,28 @@ export default function CreateSalePage() {
                     {errors.phone && <p className="text-xs text-destructive">{errors.phone.message as string}</p>}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-sm font-medium">FİN Kod <span className="text-destructive">*</span></label>
-                    <Input {...register("fin", { required: "Tələb olunur" })} placeholder="1234ABC"
-                      className={`rounded-xl h-12 bg-slate-50 ${errors.fin ? "border-destructive" : ""}`} />
+                    <label className="text-sm font-medium flex items-center justify-between">
+                      <span>FİN Kod <span className="text-destructive">*</span></span>
+                      <span className="text-[10px] text-muted-foreground font-normal">7 simvol (avtomatik axtarış)</span>
+                    </label>
+                    <Input 
+                      value={watchFin}
+                      onChange={(e) => handleFinChange(e.target.value)}
+                      placeholder="1234ABC"
+                      maxLength={7}
+                      className={`rounded-xl h-12 bg-slate-50 uppercase ${errors.fin ? "border-destructive" : ""}`} 
+                    />
                     {errors.fin && <p className="text-xs text-destructive">{errors.fin.message as string}</p>}
                   </div>
                 </div>
+
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Ünvan <span className="text-destructive">*</span></label>
                   <Input {...register("address", { required: "Tələb olunur" })} placeholder="Naxçıvan, ..."
                     className={`rounded-xl h-12 bg-slate-50 ${errors.address ? "border-destructive" : ""}`} />
                   {errors.address && <p className="text-xs text-destructive">{errors.address.message as string}</p>}
                 </div>
+
                 <div className="border-t border-border/50 pt-3">
                   <IdCardInput
                     idCardType={saleIdCardType}
@@ -369,6 +478,7 @@ export default function CreateSalePage() {
               </CardContent>
             </Card>
 
+            {/* Aktiv və Satış Şərtləri */}
             <Card className="border-none shadow-lg shadow-black/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Aktiv və Ödəniş</CardTitle>
@@ -395,40 +505,41 @@ export default function CreateSalePage() {
                   />
                 </div>
 
+                {/* Qrafik / Kart Görünüşü ilə Aktiv Seçimi */}
                 <Controller
                   name="assetId"
                   control={control}
                   rules={{ required: true }}
                   render={({ field }) => (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">
-                          Aktiv Seçin
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            ({filteredAssets.length} nəticə)
+                        <label className="text-sm font-semibold flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-primary" />
+                          Mövcud {watchAssetType === 'apartment' ? 'Mənzillər' : watchAssetType === 'object' ? 'Qeyri-yaşayış Obyektləri' : 'Avto Dayanacaqlar'}
+                          <span className="text-xs font-normal text-muted-foreground">
+                            ({filteredAssets.length} aktiv mövcuddur)
                           </span>
                         </label>
                         {hasActiveFilters && (
-                          <button type="button" onClick={clearAllFilters}
-                            className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors">
-                            <X className="w-3 h-3" /> Sıfırla
+                          <button
+                            type="button"
+                            onClick={clearAllFilters}
+                            className="flex items-center gap-1 text-xs text-destructive hover:underline"
+                          >
+                            <X className="w-3 h-3" /> Filterləri sıfırla
                           </button>
                         )}
                       </div>
 
+                      {/* Filter idarəetməsi */}
                       {watchAssetType === 'apartment' && (
-                        <div className="space-y-3 rounded-xl border border-border/60 bg-slate-50/50 p-3">
-                          <div className="flex items-center gap-1.5">
-                            <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filterlər</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Kvartal</p>
+                        <div className="space-y-2.5 rounded-2xl border border-border/60 bg-slate-50/70 p-3.5">
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                              <p className="text-[11px] font-medium text-muted-foreground mb-1">Kvartal</p>
                               <Select value={filterKvartal} onValueChange={(v) => { setFilterKvartal(v); setFilterBlock("all"); setFilterFloors(new Set()); setValue('assetId', ''); }}>
-                                <SelectTrigger className="h-8 rounded-lg text-xs bg-white border-border/60">
-                                  <SelectValue placeholder="Hamısı" />
+                                <SelectTrigger className="h-9 rounded-xl text-xs bg-white border-border/60">
+                                  <SelectValue placeholder="Bütün Kvartallar" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="all">Bütün Kvartallar</SelectItem>
@@ -439,11 +550,11 @@ export default function CreateSalePage() {
                               </Select>
                             </div>
 
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Blok / Bina</p>
+                            <div>
+                              <p className="text-[11px] font-medium text-muted-foreground mb-1">Blok / Bina</p>
                               <Select value={filterBlock} onValueChange={(v) => { setFilterBlock(v); setFilterFloors(new Set()); setValue('assetId', ''); }}>
-                                <SelectTrigger className="h-8 rounded-lg text-xs bg-white border-border/60">
-                                  <SelectValue placeholder="Hamısı" />
+                                <SelectTrigger className="h-9 rounded-xl text-xs bg-white border-border/60">
+                                  <SelectValue placeholder="Bütün Bloklar" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="all">Bütün Bloklar</SelectItem>
@@ -456,8 +567,8 @@ export default function CreateSalePage() {
                           </div>
 
                           {uniqueRooms.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Otaq sayı</p>
+                            <div>
+                              <p className="text-[11px] font-medium text-muted-foreground mb-1">Otaq sayı</p>
                               <div className="flex flex-wrap gap-1.5">
                                 <FilterChip label="Hamısı" active={filterRooms === "all"} onClick={() => setFilterRooms("all")} />
                                 {uniqueRooms.map((r: any) => (
@@ -470,15 +581,15 @@ export default function CreateSalePage() {
                           )}
 
                           {uniqueFloors.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">
+                            <div>
+                              <p className="text-[11px] font-medium text-muted-foreground mb-1">
                                 Mərtəbə
                                 {filterFloors.size > 0 && (
-                                  <span className="ml-1.5 text-primary font-medium">({filterFloors.size} seçilib)</span>
+                                  <span className="ml-1 text-primary font-bold">({filterFloors.size})</span>
                                 )}
-                                <span className="ml-1.5 text-muted-foreground/50 font-normal text-[10px]">çox seçim mümkündür</span>
                               </p>
                               <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                                <FilterChip key="all-fl" label="Hamısı" active={filterFloors.size === 0} onClick={() => setFilterFloors(new Set())} />
                                 {uniqueFloors.map((f: any) => (
                                   <FilterChip key={f} label={toRoman(f)}
                                     active={filterFloors.has(f)}
@@ -487,79 +598,86 @@ export default function CreateSalePage() {
                               </div>
                             </div>
                           )}
-
-                          <div className="relative pt-1 border-t border-border/40">
-                            <Search className="absolute left-3 top-1/2 translate-y-0.5 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                            <Input
-                              value={assetSearch}
-                              onChange={(e) => setAssetSearch(e.target.value)}
-                              placeholder="Mənzil nömrəsi ilə axtarış..."
-                              className="rounded-lg h-8 bg-white pl-8 text-xs border-border/60"
-                            />
-                          </div>
                         </div>
                       )}
 
-                      {watchAssetType !== 'apartment' && (
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                          <Input value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
-                            placeholder="Axtarış..." className="rounded-xl h-10 bg-slate-50 pl-9 text-sm"
-                            disabled={!watchAssetType} />
+                      {/* Görkəmli Kart Görünüşü (Grid) */}
+                      {filteredAssets.length === 0 ? (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-border text-muted-foreground text-sm">
+                          Seçilmiş filterlərə uyğun aktiv tapılmadı
                         </div>
-                      )}
-
-                      <div className="rounded-xl border border-border/60 bg-slate-50/50 overflow-y-auto max-h-56 p-2">
-                        {!watchAssetType ? (
-                          <p className="text-sm text-muted-foreground text-center py-6">Əvvəlcə aktiv növünü seçin</p>
-                        ) : filteredAssets.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-6">Bu filterlərə uyğun boş aktiv tapılmadı</p>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-2">
-                            {filteredAssets.map((a: any) => {
-                              const isSelected = field.value === a.id.toString();
-                              return (
-                                <button
-                                  key={a.id}
-                                  type="button"
-                                  onClick={() => field.onChange(a.id.toString())}
-                                  className={`text-left rounded-lg border-2 px-3 py-2.5 transition-all cursor-pointer hover:border-primary/50 hover:bg-white ${
-                                    isSelected ? "border-primary bg-primary/5 shadow-sm" : "border-border/50 bg-white"
-                                  }`}
-                                >
-                                  {watchAssetType === 'apartment' ? (
-                                    <>
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-semibold text-primary truncate">{a.blockName}</span>
-                                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
-                                      </div>
-                                      <p className="font-bold text-sm text-foreground">№ {a.number}</p>
-                                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-0.5"><Layers className="w-3 h-3" />{toRoman(a.floor)} mərtəbə</span>
-                                        <span className="flex items-center gap-0.5"><SquareStack className="w-3 h-3" />{a.area} m²</span>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground mt-0.5">{a.rooms} otaq</p>
-                                    </>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto p-2 bg-slate-50/50 rounded-2xl border border-border/60">
+                          {filteredAssets.map((asset: any) => {
+                            const isSelected = field.value === asset.id.toString();
+                            return (
+                              <div
+                                key={asset.id}
+                                onClick={() => field.onChange(asset.id.toString())}
+                                className={`p-3 rounded-xl border text-left cursor-pointer transition-all duration-150 relative ${
+                                  isSelected
+                                    ? "bg-primary text-white border-primary shadow-md ring-2 ring-primary/40 -translate-y-0.5"
+                                    : "bg-white hover:border-primary/60 hover:shadow-sm border-border/70"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className={`font-bold text-base ${isSelected ? "text-white" : "text-foreground"}`}>
+                                    {watchAssetType === 'apartment' ? `Mənzil № ${asset.number}` : watchAssetType === 'object' ? `Obyekt № ${asset.number}` : `Qaraj № ${asset.number}`}
+                                  </span>
+                                  {isSelected ? (
+                                    <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
                                   ) : (
-                                    <>
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-semibold text-primary truncate">
-                                          {watchAssetType === 'garage' ? 'Avto Dayanacaq' : 'Obyekt'}
-                                        </span>
-                                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
-                                      </div>
-                                      <p className="font-bold text-sm text-foreground">№ {a.number}</p>
-                                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                                        <Building2 className="w-3 h-3" />{a.area} m²
-                                      </div>
-                                    </>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      Boş
+                                    </span>
                                   )}
-                                </button>
-                              );
-                            })}
+                                </div>
+
+                                <p className={`text-xs mt-1 truncate ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
+                                  {asset.blockName ? `${asset.blockName} • ` : ""}{asset.floor ? `${toRoman(asset.floor)} mərtəbə` : ""}
+                                </p>
+
+                                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/30 text-xs">
+                                  <span className={isSelected ? "text-white/90" : "text-foreground font-medium"}>
+                                    {asset.rooms ? `${asset.rooms} otaq` : watchAssetType}
+                                  </span>
+                                  <span className={`font-bold ${isSelected ? "text-white" : "text-primary"}`}>
+                                    {asset.area > 0 ? `${asset.area} m²` : "Qaraj"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Seçilmiş aktivin qabarıq göstərilməsi */}
+                      {field.value && (
+                        <div className="p-3 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-primary font-medium">
+                            <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                            <span>
+                              <strong>Seçilmiş Aktiv:</strong> {
+                                (() => {
+                                  const sel = filteredAssets.find((a: any) => a.id.toString() === field.value);
+                                  if (!sel) return `#${field.value}`;
+                                  return watchAssetType === 'apartment'
+                                    ? `${sel.blockName} — Mənzil ${sel.number} (${sel.floor}-ci mərtəbə, ${sel.rooms} otaq, ${sel.area} m²)`
+                                    : `${sel.number} (${sel.area} m²)`;
+                                })()
+                              }
+                            </span>
                           </div>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange("")}
+                            className="text-xs text-muted-foreground hover:text-destructive underline"
+                          >
+                            Dəyiş
+                          </button>
+                        </div>
+                      )}
+
                       {errors.assetId && (
                         <p className="text-xs text-destructive">Aktiv seçmək mütləqdir</p>
                       )}
@@ -611,33 +729,98 @@ export default function CreateSalePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                {/* Müqavilə və Qaimə Nömrələri (MƏCBURİ VƏ CANLI UNİKALLIQ YOXLANIŞI) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                      Müqavilə Nömrəsi
+                      Müqavilə Nömrəsi <span className="text-destructive">*</span>
                     </label>
-                    <Input {...register("contractNumber")} placeholder="M-2024-001" className="rounded-xl h-12 bg-slate-50" />
+                    <Input 
+                      {...register("contractNumber", { required: "Müqavilə nömrəsi mütləqdir" })} 
+                      placeholder="Məs: M-2024-001" 
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.contractNumber || isContractDuplicate ? "border-destructive ring-1 ring-destructive" : ""}`} 
+                    />
+                    {isContractDuplicate && (
+                      <p className="text-[11px] text-destructive flex items-center gap-1 font-semibold">
+                        <AlertTriangle className="w-3 h-3" /> Bu müqavilə nömrəsi artıq verilib!
+                      </p>
+                    )}
+                    {errors.contractNumber && !isContractDuplicate && (
+                      <p className="text-xs text-destructive">{errors.contractNumber.message as string}</p>
+                    )}
                   </div>
-                  <div className="space-y-2">
+
+                  <div className="space-y-1">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                      Qaimə Nömrəsi
+                      Qaimə Nömrəsi <span className="text-destructive">*</span>
                     </label>
-                    <Input {...register("qaimeNumber")} placeholder="Q-2024-001" className="rounded-xl h-12 bg-slate-50" />
+                    <Input 
+                      {...register("qaimeNumber", { required: "Qaimə nömrəsi mütləqdir" })} 
+                      placeholder="Məs: Q-2024-001" 
+                      className={`rounded-xl h-12 bg-slate-50 ${errors.qaimeNumber || isQaimeDuplicate ? "border-destructive ring-1 ring-destructive" : ""}`} 
+                    />
+                    {isQaimeDuplicate && (
+                      <p className="text-[11px] text-destructive flex items-center gap-1 font-semibold">
+                        <AlertTriangle className="w-3 h-3" /> Bu qaimə nömrəsi artıq verilib!
+                      </p>
+                    )}
+                    {errors.qaimeNumber && !isQaimeDuplicate && (
+                      <p className="text-xs text-destructive">{errors.qaimeNumber.message as string}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      Müqavilə Tarixi <span className="text-destructive">*</span>
+                    </label>
+                    <Input 
+                      type="date" 
+                      {...register("saleDate", { required: "Tarix mütləqdir" })} 
+                      min={!isAdmin ? todayStr : undefined}
+                      readOnly={!isAdmin}
+                      className={`rounded-xl h-12 ${!isAdmin ? "bg-muted cursor-not-allowed opacity-90" : "bg-slate-50"}`} 
+                    />
+                    {!isAdmin && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Satıcı üçün yalnız cari gün tətbiq olunur</p>
+                    )}
                   </div>
                 </div>
 
+                {/* Kredit Sahələri */}
                 {watchSaleType === 'credit' && (
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">İlkin Ödəniş (AZN)</label>
-                      <Input type="number" {...register("downPayment", { required: true })} className="rounded-xl h-12 bg-slate-50" />
+                  <div className="space-y-4 pt-4 border-t border-border/50">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">İlkin Ödəniş (AZN)</label>
+                        <Input type="number" {...register("downPayment", { required: true })} className="rounded-xl h-12 bg-slate-50" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Müddət (Ay)</label>
+                        <Input type="number" {...register("installmentMonths", { required: true })} className="rounded-xl h-12 bg-slate-50" />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Müddət (Ay)</label>
-                      <Input type="number" {...register("installmentMonths", { required: true })} className="rounded-xl h-12 bg-slate-50" />
-                    </div>
+
+                    {/* YALNIZ ADMINISTRATOR ÜÇÜN KÖHNƏ MÜQAVİLƏLƏRDƏ ÖDƏNİLMİŞ MƏBLƏĞ */}
+                    {isAdmin && (
+                      <div className="space-y-2 rounded-xl bg-blue-50/60 border border-blue-200/60 p-4">
+                        <label className="text-sm font-semibold text-blue-950 flex items-center justify-between">
+                          <span>İndiyə qədər ödənilmiş cəmi məbləğ (Köhnə müqavilələr üçün)</span>
+                          <span className="text-xs text-blue-600 font-normal">Yalnız Admin</span>
+                        </label>
+                        <Input
+                          type="number"
+                          {...register("initialPaidAmount")}
+                          placeholder="Məs: 18000"
+                          className="rounded-xl h-11 bg-white border-blue-200"
+                        />
+                        <p className="text-xs text-blue-800/80">
+                          Əgər keçmiş tarixli satış daxil edirsinizsə, sakinin bu günə qədər ödədiyi cəmi məbləği qeyd edin. Sistem həmin məbləği keçmiş ayların üzərinə ardıcıl paylayacaq və sakin sistemdə borclu/gecikmədə çıxmayacaq.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -645,6 +828,7 @@ export default function CreateSalePage() {
 
           </div>
 
+          {/* Kalkulyator & Xülasə */}
           <div className="md:col-span-1 space-y-6">
             <Card className="border-none shadow-lg shadow-primary/5 bg-gradient-to-b from-white to-slate-50 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
@@ -701,7 +885,11 @@ export default function CreateSalePage() {
                   </div>
                 )}
 
-                <Button type="submit" disabled={loading || !watchAssetId} className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all mt-6">
+                <Button 
+                  type="submit" 
+                  disabled={loading || !watchAssetId || isContractDuplicate || isQaimeDuplicate} 
+                  className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all mt-6"
+                >
                   {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Satışı Təsdiqlə"}
                 </Button>
               </CardContent>

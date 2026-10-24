@@ -307,13 +307,18 @@ export interface CommunalBill {
   assetId: number;
   assetDescription: string;
   ownerName: string;
+  blockName: string;
   month: number;
   year: number;
   area: number;
   tariff: number;
+  customTariff?: number | null;
   amount: number;
+  carryOver: number;
+  totalAmount: number;
   status: PaymentStatus;
   paidDate?: string | null;
+  isGarageRent: boolean;
 }
 
 export interface GenerateBillsInput {

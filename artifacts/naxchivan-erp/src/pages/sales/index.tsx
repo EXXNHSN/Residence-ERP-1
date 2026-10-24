@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useListSales } from "@workspace/api-client-react";
+import { useListSales, useListCustomers } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,7 +18,7 @@ import { formatCurrency } from "@/lib/utils";
 import {
   Plus, Loader2, Pencil, CreditCard, Home, Store, Car,
   ChevronDown, ChevronUp, TrendingUp, Search, ReceiptText,
-  Wallet, AlertCircle, Trash2
+  Wallet, AlertCircle, Trash2, ArrowRightLeft, Info, FileText
 } from "lucide-react";
 
 const BASE = () => import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -64,8 +65,8 @@ const SECTIONS = [
 
 // ── SaleRow ──────────────────────────────────────────────────
 function SaleRow({
-  sale, isAdmin, onEdit, onDelete,
-}: { sale: any; isAdmin: boolean; onEdit: (s: any) => void; onDelete: (s: any) => void }) {
+  sale, isAdmin, onEdit, onDelete, onTransfer,
+}: { sale: any; isAdmin: boolean; onEdit: (s: any) => void; onDelete: (s: any) => void; onTransfer: (s: any) => void }) {
   return (
     <TableRow className="hover:bg-muted/20 transition-colors border-b border-border/30 last:border-0 group">
       <TableCell className="pl-5 text-sm text-muted-foreground whitespace-nowrap">
@@ -81,7 +82,15 @@ function SaleRow({
         )}
       </TableCell>
       <TableCell className="font-medium text-sm text-foreground">
-        {sale.assetDescription}
+        <div>
+          <span>{sale.assetDescription}</span>
+          {(sale.contractNumber || sale.qaimeNumber) && (
+            <p className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+              {sale.contractNumber && <span>Müqav: <strong>{sale.contractNumber}</strong></span>}
+              {sale.qaimeNumber && <span>Qaimə: <strong>{sale.qaimeNumber}</strong></span>}
+            </p>
+          )}
+        </div>
       </TableCell>
       <TableCell><StatusBadge status={sale.saleType} /></TableCell>
       <TableCell className="text-right">
@@ -117,12 +126,14 @@ function SaleRow({
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
             <Button size="icon" variant="ghost"
               className="h-7 w-7 text-muted-foreground hover:text-primary"
-              onClick={() => onEdit(sale)}>
+              onClick={() => onEdit(sale)}
+              title="Redaktə et (Admin)">
               <Pencil className="w-3.5 h-3.5" />
             </Button>
             <Button size="icon" variant="ghost"
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              onClick={() => onDelete(sale)}>
+              onClick={() => onDelete(sale)}
+              title="Sil (Admin)">
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
           </div>
@@ -134,13 +145,14 @@ function SaleRow({
 
 // ── SectionPanel ─────────────────────────────────────────────
 function SectionPanel({
-  section, sales, isAdmin, onEdit, onDelete, isOpen, onToggle,
+  section, sales, isAdmin, onEdit, onDelete, onTransfer, isOpen, onToggle,
 }: {
   section: typeof SECTIONS[number];
   sales: any[];
   isAdmin: boolean;
   onEdit: (s: any) => void;
   onDelete: (s: any) => void;
+  onTransfer: (s: any) => void;
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -264,7 +276,7 @@ function SectionPanel({
                 </TableHeader>
                 <TableBody>
                   {sales.map(sale => (
-                    <SaleRow key={sale.id} sale={sale} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} />
+                    <SaleRow key={sale.id} sale={sale} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} onTransfer={onTransfer} />
                   ))}
                 </TableBody>
               </Table>
@@ -279,6 +291,11 @@ function SectionPanel({
 // ── Main Page ─────────────────────────────────────────────────
 export default function SalesPage() {
   const { data: sales, isLoading } = useListSales();
+  const { data: customers } = useListCustomers();
+  const [transferSale, setTransferSale] = useState<any>(null);
+  const [transferCustomerId, setTransferCustomerId] = useState<string>("");
+  const [transferDate, setTransferDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [transferNote, setTransferNote] = useState<string>("");
   const { isAdmin, user } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -286,12 +303,16 @@ export default function SalesPage() {
   const [search, setSearch] = useState("");
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["apartment"]));
 
+  // Edit State
   const [editOpen, setEditOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<any>(null);
   const [editPrice, setEditPrice] = useState("");
   const [editDown, setEditDown] = useState("");
   const [editMonths, setEditMonths] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [editContractNumber, setEditContractNumber] = useState("");
+  const [editQaimeNumber, setEditQaimeNumber] = useState("");
+  const [editInitialPaidAmount, setEditInitialPaidAmount] = useState("");
 
   const [deleteSale, setDeleteSale] = useState<any>(null);
 
@@ -303,12 +324,50 @@ export default function SalesPage() {
     });
   }
 
+  function openTransfer(sale: any) {
+    setTransferSale(sale);
+    setTransferCustomerId("");
+    setTransferDate(format(new Date(), "yyyy-MM-dd"));
+    setTransferNote("");
+  }
+
+  async function handleTransferSale(adminPassword: string) {
+    if (!transferCustomerId) {
+      throw new Error("Zəhmət olmasa yeni sakini seçin");
+    }
+    const res = await fetch(`${BASE()}/api/sales/${transferSale.id}/transfer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: user?.username,
+        password: adminPassword,
+        newCustomerId: Number(transferCustomerId),
+        transferDate,
+        note: transferNote,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Xəta" }));
+      throw new Error(err.error ?? "Transfer zamanı xəta baş verdi");
+    }
+    toast({ title: "Mənzil uğurla yeni sakinin adına keçirildi" });
+    qc.invalidateQueries({ queryKey: ["sales"] });
+    qc.invalidateQueries({ queryKey: ["customers"] });
+    qc.invalidateQueries({ queryKey: ["apartments"] });
+    qc.invalidateQueries({ queryKey: ["/api/stats/summary"] });
+    setTransferSale(null);
+  }
+
   function openEdit(sale: any) {
     setEditingSale(sale);
     setEditPrice(sale.pricePerSqm?.toString() ?? "");
     setEditDown(sale.downPayment?.toString() ?? "0");
     setEditMonths(sale.installmentMonths?.toString() ?? "12");
     setEditDate(format(new Date(sale.saleDate), "yyyy-MM-dd"));
+    setEditContractNumber(sale.contractNumber ?? "");
+    setEditQaimeNumber(sale.qaimeNumber ?? "");
+    const paidTaksit = Math.max(0, (sale.paidAmount ?? 0) - (sale.downPayment ?? 0));
+    setEditInitialPaidAmount(paidTaksit > 0 ? paidTaksit.toString() : "");
     setEditOpen(true);
   }
 
@@ -335,10 +394,15 @@ export default function SalesPage() {
       password: adminPassword,
       pricePerSqm: Number(editPrice),
       saleDate: editDate,
+      contractNumber: editContractNumber.trim(),
+      qaimeNumber: editQaimeNumber.trim(),
     };
     if (editingSale?.saleType === "credit") {
       body.downPayment = Number(editDown);
       body.installmentMonths = Number(editMonths);
+      if (editInitialPaidAmount !== "") {
+        body.initialPaidAmount = Number(editInitialPaidAmount);
+      }
     }
     const res = await fetch(`${BASE()}/api/sales/${editingSale.id}`, {
       method: "PUT",
@@ -349,9 +413,11 @@ export default function SalesPage() {
       const err = await res.json().catch(() => ({ error: "Xəta" }));
       throw new Error(err.error ?? "Xəta baş verdi");
     }
-    toast({ title: "Satış məlumatları yeniləndi" });
+    toast({ title: "Satış məlumatları uğurla yeniləndi" });
     qc.invalidateQueries({ queryKey: ["sales"] });
     qc.invalidateQueries({ queryKey: ["customers"] });
+    qc.invalidateQueries({ queryKey: ["/api/sales"] });
+    setEditOpen(false);
   }
 
   // Filter + split by type
@@ -362,7 +428,9 @@ export default function SalesPage() {
       ? sales.filter((s: any) =>
           s.customerName?.toLowerCase().includes(q) ||
           s.assetDescription?.toLowerCase().includes(q) ||
-          s.customerPhone?.includes(q)
+          s.customerPhone?.includes(q) ||
+          (s.contractNumber && s.contractNumber.toLowerCase().includes(q)) ||
+          (s.qaimeNumber && s.qaimeNumber.toLowerCase().includes(q))
         )
       : sales;
     return {
@@ -398,15 +466,16 @@ export default function SalesPage() {
               className="inline-flex items-center gap-2 h-10 rounded-xl px-4 border border-border/60 bg-card hover:bg-muted text-sm font-medium text-foreground transition-colors shadow-sm">
               <CreditCard className="w-4 h-4 text-blue-600" /> Kredit Hesabat
             </Link>
-            <Link href="/sales/create"
-              className="inline-flex items-center gap-2 h-10 rounded-xl px-5 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium shadow-lg shadow-primary/25 transition-colors">
-              <Plus className="w-4 h-4" /> Yeni Satış
+            <Link href="/sales/create">
+              <Button className="rounded-xl px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 gap-2">
+                <Plus className="w-4 h-4" /> Yeni Satış
+              </Button>
             </Link>
           </div>
         </div>
 
-        {/* ── Overall stats ── */}
-        {!isLoading && sales && sales.length > 0 && (
+        {/* ── Metric cards ── */}
+        {!isLoading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Cəmi Satış", value: totals.count, display: String(totals.count), icon: ReceiptText, color: "text-foreground", bg: "bg-card" },
@@ -438,7 +507,7 @@ export default function SalesPage() {
                 setSearch(e.target.value);
                 if (e.target.value) setOpenSections(new Set(["apartment", "object", "garage"]));
               }}
-              placeholder="Sakin adı, aktiv, telefon..."
+              placeholder="Sakin, mənzil, müqavilə, qaimə..."
               className="pl-9 rounded-xl h-10 bg-card border-border/60"
             />
           </div>
@@ -467,6 +536,7 @@ export default function SalesPage() {
                 isAdmin={isAdmin}
                 onEdit={openEdit}
                 onDelete={setDeleteSale}
+                onTransfer={openTransfer}
                 isOpen={openSections.has(section.key)}
                 onToggle={() => toggleSection(section.key)}
               />
@@ -512,41 +582,155 @@ export default function SalesPage() {
         )}
       </AdminEditDialog>
 
-      {/* ── Edit Dialog ── */}
-      <AdminEditDialog open={editOpen} onClose={() => setEditOpen(false)}
-        title="Satışı Redaktə et" onSave={handleSaveSale}>
+      {/* ── Edit Dialog (ADMIN TƏSDİQ ŞİFRƏSİ İLƏ) ── */}
+      <AdminEditDialog 
+        open={editOpen} 
+        onClose={() => setEditOpen(false)}
+        title="Satışı Redaktə et (Admin Təsdiqi)" 
+        onSave={handleSaveSale}
+        saveLabel="Yenilə"
+      >
         {editingSale && (
           <div className="space-y-3">
             <div className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2.5 flex items-center gap-2">
-              <ReceiptText className="w-4 h-4 flex-shrink-0" />
-              {editingSale.customerName} — {editingSale.assetDescription}
+              <ReceiptText className="w-4 h-4 flex-shrink-0 text-primary" />
+              <span className="font-semibold text-foreground">{editingSale.customerName}</span> — {editingSale.assetDescription}
             </div>
+
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">1 m² Qiyməti (AZN)</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Müqavilə Nömrəsi *</label>
+                <Input value={editContractNumber} onChange={e => setEditContractNumber(e.target.value)}
+                  className="rounded-xl h-11" placeholder="M-2024-001" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Qaimə Nömrəsi *</label>
+                <Input value={editQaimeNumber} onChange={e => setEditQaimeNumber(e.target.value)}
+                  className="rounded-xl h-11" placeholder="Q-2024-001" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">1 m² Qiyməti (AZN)</label>
                 <Input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)}
                   className="rounded-xl h-11" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tarix</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Müqavilə Tarixi</label>
                 <Input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
                   className="rounded-xl h-11" />
               </div>
             </div>
+
             {editingSale.saleType === "credit" && (
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">İlkin Ödəniş (AZN)</label>
-                  <Input type="number" value={editDown} onChange={e => setEditDown(e.target.value)}
-                    className="rounded-xl h-11" />
+              <>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">İlkin Ödəniş (AZN)</label>
+                    <Input type="number" value={editDown} onChange={e => setEditDown(e.target.value)}
+                      className="rounded-xl h-11" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Müddət (Ay)</label>
+                    <Input type="number" value={editMonths} onChange={e => setEditMonths(e.target.value)}
+                      className="rounded-xl h-11" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Müddət (Ay)</label>
-                  <Input type="number" value={editMonths} onChange={e => setEditMonths(e.target.value)}
-                    className="rounded-xl h-11" />
+
+                <div className="space-y-2 pt-2 border-t border-border/50 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                  <label className="text-xs font-semibold text-blue-950 flex items-center justify-between">
+                    <span>İndiyə qədər ödənilmiş cəmi taksit (AZN)</span>
+                    <span className="text-[10px] text-blue-600 font-normal">Köhnə Müqavilə Düzəlişi</span>
+                  </label>
+                  <Input 
+                    type="number" 
+                    value={editInitialPaidAmount} 
+                    onChange={e => setEditInitialPaidAmount(e.target.value)}
+                    placeholder="Məs: 15000" 
+                    className="rounded-xl h-10 bg-white border-blue-200" 
+                  />
+                  <p className="text-[11px] text-blue-800/80 leading-snug">
+                    Bu məbləğ dəyişdirildikdə sistem 1-ci aydan başlayaraq ödəmələri paylayır, ödənilmiş və qalıq borcu dəqiq tənzimləyir.
+                  </p>
                 </div>
-              </div>
+              </>
             )}
+          </div>
+        )}
+      </AdminEditDialog>
+
+      {/* ── Transfer Dialog ── */}
+      <AdminEditDialog
+        open={!!transferSale}
+        onClose={() => setTransferSale(null)}
+        title="Mənzili Yeni Sakinə Təhvil Ver (Sahib Dəyişməsi)"
+        saveLabel="Təsdiq et və Təhvil Ver"
+        onSave={handleTransferSale}
+      >
+        {transferSale && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-blue-50/60 border border-blue-200/60 p-4 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Aktiv:</span>
+                <span className="font-semibold text-foreground">{transferSale.assetDescription}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cari Sahib:</span>
+                <span className="font-semibold text-blue-700">{transferSale.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Qalıq Borc:</span>
+                <span className="font-medium text-amber-700">{formatCurrency(transferSale.remainingAmount)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Yeni Sahib (Sakin) *</label>
+              <Select value={transferCustomerId} onValueChange={setTransferCustomerId}>
+                <SelectTrigger className="rounded-xl h-11 bg-white">
+                  <SelectValue placeholder="Yeni sakini seçin..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {customers
+                    ?.filter((c: any) => c.id !== transferSale.customerId)
+                    .map((c: any) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.firstName} {c.lastName} ({c.phone || c.fin || "ID: " + c.id})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Təhvil Tarixi</label>
+                <Input
+                  type="date"
+                  value={transferDate}
+                  onChange={e => setTransferDate(e.target.value)}
+                  className="rounded-xl h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Qeyd / Əsas</label>
+                <Input
+                  value={transferNote}
+                  onChange={e => setTransferNote(e.target.value)}
+                  placeholder="Məs: Alqı-satqı müqaviləsi №"
+                  className="rounded-xl h-11"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-amber-50 border border-amber-200/60 p-3 text-xs text-amber-800 space-y-1">
+              <p className="font-semibold flex items-center gap-1">
+                <Info className="w-3.5 h-3.5" /> Məlumatların qorunması:
+              </p>
+              <p>• Köhnə sahibin tarixi ödənişləri arxivdə tam qorunub saxlanacaq.</p>
+              <p>• Mənzilin gələcək bütün kommunal hesabları və qalıq kredit yeni sahibin adına keçəcək.</p>
+            </div>
           </div>
         )}
       </AdminEditDialog>

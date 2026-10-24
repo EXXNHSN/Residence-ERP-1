@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { objectsTable, tariffsTable, blocksTable, quartersTable, buildingsTable, rentalsTable, customersTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { objectsTable, tariffsTable, blocksTable, quartersTable, buildingsTable, rentalsTable, customersTable, salesTable } from "@workspace/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
@@ -92,6 +92,14 @@ async function enrichObject(obj: typeof objectsTable.$inferSelect, garageFixedPr
     rentalEnd: null as string | null,
     monthlyAmount: null as number | null,
     customerId: null as number | null,
+    // sale info filled in separately
+    saleId: null as number | null,
+    soldPrice: null as number | null,
+    contractNumber: null as string | null,
+    qaimeNumber: null as string | null,
+    saleDate: null as string | null,
+    buyerName: null as string | null,
+    buyerPhone: null as string | null,
   };
 }
 
@@ -127,6 +135,46 @@ async function attachRentalInfo(objects: Awaited<ReturnType<typeof enrichObject>
   return objects;
 }
 
+async function attachSaleInfo(objects: Awaited<ReturnType<typeof enrichObject>>[]) {
+  const soldObjs = objects.filter(o => o.status === "sold" && o.type === "object");
+  if (soldObjs.length === 0) return objects;
+
+  for (const obj of soldObjs) {
+    const [sale] = await db
+      .select({
+        id: salesTable.id,
+        totalAmount: salesTable.totalAmount,
+        paidAmount: salesTable.paidAmount,
+        contractNumber: salesTable.contractNumber,
+        qaimeNumber: salesTable.qaimeNumber,
+        saleDate: salesTable.saleDate,
+        customerId: salesTable.customerId,
+      })
+      .from(salesTable)
+      .where(and(eq(salesTable.assetType, "object"), eq(salesTable.assetId, obj.id)))
+      .orderBy(desc(salesTable.id))
+      .limit(1);
+
+    if (sale) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const o = obj as any;
+      o.saleId = sale.id;
+      o.soldPrice = Number(sale.totalAmount);
+      o.contractNumber = sale.contractNumber;
+      o.qaimeNumber = sale.qaimeNumber;
+      o.saleDate = sale.saleDate ? sale.saleDate.toISOString() : null;
+      if (sale.customerId) {
+        const [cust] = await db.select().from(customersTable).where(eq(customersTable.id, sale.customerId)).limit(1);
+        if (cust) {
+          o.buyerName = `${cust.firstName} ${cust.lastName}`;
+          o.buyerPhone = cust.phone;
+        }
+      }
+    }
+  }
+  return objects;
+}
+
 router.get("/", async (req, res) => {
   const { type, status, blockId } = req.query;
   const conditions: ReturnType<typeof eq>[] = [];
@@ -147,7 +195,8 @@ router.get("/", async (req, res) => {
     objs.map(async (obj) => enrichObject(obj, garageFixedPrices, obj.type === "garage" ? 0 : objectPricePerSqm))
   );
   const enrichedWithRentals = await attachRentalInfo(results);
-  res.json(enrichedWithRentals);
+  const enrichedWithSales = await attachSaleInfo(enrichedWithRentals);
+  res.json(enrichedWithSales);
 });
 
 // Bulk garage setup for a block

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import app from "./app";
-import { db } from "@workspace/db";
+import { db, pool } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import bcrypt from "bcryptjs";
 
@@ -16,6 +16,20 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+async function ensureCommunalBillsColumns() {
+  try {
+    await pool.query(`
+      ALTER TABLE communal_bills ADD COLUMN IF NOT EXISTS custom_tariff numeric(10, 4);
+      ALTER TABLE communal_bills ADD COLUMN IF NOT EXISTS carry_over numeric(12, 2) NOT NULL DEFAULT '0';
+      ALTER TABLE communal_bills ADD COLUMN IF NOT EXISTS total_amount numeric(12, 2);
+      UPDATE communal_bills SET total_amount = amount WHERE total_amount IS NULL;
+    `);
+    console.log("Communal bills schema verified/migrated.");
+  } catch (err) {
+    console.error("Migration error for communal_bills:", err);
+  }
 }
 
 async function seedDefaultUsers() {
@@ -38,5 +52,6 @@ async function seedDefaultUsers() {
 
 app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
+  await ensureCommunalBillsColumns();
   await seedDefaultUsers();
 });

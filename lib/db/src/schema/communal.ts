@@ -11,7 +11,13 @@ export const communalBillsTable = pgTable("communal_bills", {
   year: integer("year").notNull(),
   area: numeric("area", { precision: 10, scale: 2 }).notNull(),
   tariff: numeric("tariff", { precision: 10, scale: 4 }).notNull(),
+  // Admin tərəfindən güzəşt edilmiş fərdi tarif (NULL = ümumi tarif istifadə olunur)
+  customTariff: numeric("custom_tariff", { precision: 10, scale: 4 }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  // Əvvəlki aylardan yığılmış ödənilməmiş borc
+  carryOver: numeric("carry_over", { precision: 12, scale: 2 }).notNull().default("0"),
+  // Cari ay borcu + köhnə borc = totalAmount
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
   status: text("status", { enum: ["pending", "paid", "overdue"] }).notNull().default("pending"),
   paidDate: timestamp("paid_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

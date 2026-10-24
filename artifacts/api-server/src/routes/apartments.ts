@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { apartmentsTable, blocksTable, tariffsTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { apartmentsTable, blocksTable, tariffsTable, communalBillsTable, salesTable } from "@workspace/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 import { verifyAdmin } from "./adminVerify";
 
 const router = Router();
@@ -9,6 +9,11 @@ const router = Router();
 async function getApartmentPricePerSqm(): Promise<number> {
   const tariff = await db.select().from(tariffsTable).where(eq(tariffsTable.key, "apartment_price_per_sqm"));
   return tariff.length ? Number(tariff[0].value) : 1000;
+}
+
+async function getCommunalTariff(): Promise<number> {
+  const tariff = await db.select().from(tariffsTable).where(eq(tariffsTable.key, "communal_tariff"));
+  return tariff.length ? Number(tariff[0].value) : 0.5;
 }
 
 function generatePaymentCode(): string {
@@ -121,14 +126,76 @@ router.put("/:id", async (req, res) => {
   res.json(await enrichApartment(updated, block[0]?.name ?? "", pricePerSqm));
 });
 
+// Tehvil toggle — satılmış mənzil təhvil edildikdə avtomatik kommunal bölməsinə hesab düşür
 router.patch("/:id/handover", async (req, res) => {
   const { handedOver } = req.body;
+  const newHandedOver = Boolean(handedOver);
+
   const [updated] = await db
     .update(apartmentsTable)
-    .set({ handedOver: Boolean(handedOver) })
+    .set({ handedOver: newHandedOver })
     .where(eq(apartmentsTable.id, Number(req.params.id)))
     .returning();
+
   if (!updated) return res.status(404).json({ error: "Tapılmadı" });
+
+  // Tehvil true edildikdə və mənzil satılıbsa — cari ay üçün kommunal qeyd yarat (əgər yoxdursa)
+  if (newHandedOver && updated.status === "sold") {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    const existing = await db.select().from(communalBillsTable)
+      .where(and(
+        eq(communalBillsTable.assetType, "apartment" as const),
+        eq(communalBillsTable.assetId, updated.id),
+        eq(communalBillsTable.month, currentMonth),
+        eq(communalBillsTable.year, currentYear)
+      ));
+
+    if (existing.length === 0) {
+      const tariff = await getCommunalTariff();
+      const area = Number(updated.area);
+      const amount = Math.round(area * tariff * 100) / 100;
+
+      const [sale] = await db.select().from(salesTable)
+        .where(and(
+          eq(salesTable.assetType, "apartment" as const),
+          eq(salesTable.assetId, updated.id)
+        ));
+
+      // Əvvəlki aylardan yığılmış ödənilməmiş borc
+      const priorBills = await db.select().from(communalBillsTable)
+        .where(and(
+          eq(communalBillsTable.assetType, "apartment" as const),
+          eq(communalBillsTable.assetId, updated.id)
+        ));
+      const strictlyPrior = priorBills.filter(b => b.year < currentYear || (b.year === currentYear && b.month < currentMonth));
+      let carryOver = 0;
+      if (strictlyPrior.length > 0) {
+        strictlyPrior.sort((a, b) => (b.year * 100 + b.month) - (a.year * 100 + a.month));
+        if (strictlyPrior[0].status !== "paid") {
+          carryOver = Number(strictlyPrior[0].totalAmount || strictlyPrior[0].amount);
+        }
+      }
+      const totalAmount = Math.round((amount + carryOver) * 100) / 100;
+
+      await db.insert(communalBillsTable).values({
+        assetType: "apartment",
+        assetId: updated.id,
+        ownerCustomerId: sale?.customerId ?? null,
+        month: currentMonth,
+        year: currentYear,
+        area: String(area),
+        tariff: String(tariff),
+        amount: String(amount),
+        carryOver: String(carryOver),
+        totalAmount: String(totalAmount),
+        status: "pending",
+      });
+    }
+  }
+
   const block = await db.select().from(blocksTable).where(eq(blocksTable.id, updated.blockId)).limit(1);
   const pricePerSqm = await getApartmentPricePerSqm();
   res.json(await enrichApartment(updated, block[0]?.name ?? "", pricePerSqm));

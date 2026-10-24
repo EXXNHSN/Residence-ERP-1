@@ -9,11 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Loader2, Store, MapPin, Building2, Search, Pencil, Trash2, MoreVertical, KeyRound, User, Phone, Calendar, Banknote, ArrowUpRight, LayoutGrid, ChevronDown } from "lucide-react";
+import { Plus, Loader2, Store, MapPin, Building2, Search, Pencil, Trash2, MoreVertical, KeyRound, User, Phone, Calendar, Banknote, ArrowUpRight, LayoutGrid, ChevronDown, FileText } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListObjectsQueryKey, useCreateObject } from "@workspace/api-client-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AdminEditDialog } from "@/components/ui/AdminEditDialog";
+import { ContractDialog } from "@/components/ContractDialog";
 import { formatArea, formatCurrency } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ export default function ObjectsPage() {
   const [deleteObj, setDeleteObj] = useState<any | null>(null);
   const [rentObj, setRentObj] = useState<any | null>(null);
   const [rentLoading, setRentLoading] = useState(false);
+  const [contractSaleId, setContractSaleId] = useState<number | null>(null);
 
   const { isAdmin } = useAuth();
   const { toast } = useToast();
@@ -218,7 +220,8 @@ export default function ObjectsPage() {
           o.activityType?.toLowerCase().includes(q) ||
           o.blockName?.toLowerCase().includes(q) ||
           o.quarterName?.toLowerCase().includes(q) ||
-          o.tenantName?.toLowerCase().includes(q);
+          o.tenantName?.toLowerCase().includes(q) ||
+          o.buyerName?.toLowerCase().includes(q);
         if (!match) return false;
       }
       return true;
@@ -262,46 +265,46 @@ export default function ObjectsPage() {
                     <Plus className="w-4 h-4 mr-1.5" /> Tək Əlavə et
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="sm:max-w-md rounded-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-display flex items-center gap-2">
-                    <Store className="w-5 h-5 text-primary" /> Yeni Qeyri Yaşayış Sahəsi
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit(onAdd)} className="space-y-4 mt-2">
-                  <div className="space-y-2">
-                    <Label>Nömrə / Ad</Label>
-                    <Input {...register("number", { required: true })} className="rounded-xl h-11" placeholder="Məs: 1A, Mağaza-1..." />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Sahə (m²)</Label>
-                    <Input type="number" step="0.01" {...register("area")} className="rounded-xl h-11" placeholder="Məs: 80" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Yerləşdiyi Blok</Label>
-                    <Controller name="blockId" control={control} render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
-                        <SelectContent>
-                          {blocks?.map(b => (
-                            <SelectItem key={b.id} value={b.id.toString()}>
-                              {b.quarterName ? `${b.quarterName} / ` : ""}{b.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Fəaliyyət Sahəsi</Label>
-                    <Input {...register("activityType")} className="rounded-xl h-11" placeholder="Məs: Ərzaq, Apteka, Ofis..." />
-                  </div>
-                  <Button type="submit" disabled={isPending} className="w-full h-12 rounded-xl">
-                    {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Əlavə et"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+                <DialogContent className="sm:max-w-md rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-display flex items-center gap-2">
+                      <Store className="w-5 h-5 text-primary" /> Yeni Qeyri Yaşayış Sahəsi
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit(onAdd)} className="space-y-4 mt-2">
+                    <div className="space-y-2">
+                      <Label>Nömrə / Ad</Label>
+                      <Input {...register("number", { required: true })} className="rounded-xl h-11" placeholder="Məs: 1A, Mağaza-1..." />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sahə (m²)</Label>
+                      <Input type="number" step="0.01" {...register("area")} className="rounded-xl h-11" placeholder="Məs: 80" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Yerləşdiyi Blok</Label>
+                      <Controller name="blockId" control={control} render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Blok seçin..." /></SelectTrigger>
+                          <SelectContent>
+                            {blocks?.map(b => (
+                              <SelectItem key={b.id} value={b.id.toString()}>
+                                {b.quarterName ? `${b.quarterName} / ` : ""}{b.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Fəaliyyət Sahəsi</Label>
+                      <Input {...register("activityType")} className="rounded-xl h-11" placeholder="Məs: Ərzaq, Apteka, Ofis..." />
+                    </div>
+                    <Button type="submit" disabled={isPending} className="w-full h-12 rounded-xl">
+                      {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Əlavə et"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>
@@ -327,7 +330,7 @@ export default function ObjectsPage() {
           <div className="relative flex-1 max-w-sm min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Ad, fəaliyyət, blok, icarəçi..." className="pl-9 rounded-xl h-10 bg-card border-border/60" />
+              placeholder="Ad, fəaliyyət, blok, icarəçi, alıcı..." className="pl-9 rounded-xl h-10 bg-card border-border/60" />
           </div>
           <Select value={filterKvartal} onValueChange={v => { setFilterKvartal(v); setFilterBlock("all"); }}>
             <SelectTrigger className="w-[160px] rounded-xl h-10 bg-card"><SelectValue placeholder="Kvartal" /></SelectTrigger>
@@ -352,19 +355,6 @@ export default function ObjectsPage() {
               className="text-xs text-primary hover:underline">
               Sıfırla
             </button>
-          )}
-          {tariffs && (
-            <div className="text-xs text-muted-foreground hidden sm:flex items-center gap-1.5 ml-auto">
-              <span>1 m² satış:</span>
-              <span className="font-semibold text-foreground">{formatCurrency(tariffs.objectPricePerSqm)}</span>
-              {(tariffs as any).objectMonthlyRent && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>Aylıq İcarə:</span>
-                  <span className="font-semibold text-foreground">{formatCurrency((tariffs as any).objectMonthlyRent)}</span>
-                </>
-              )}
-            </div>
           )}
         </div>
 
@@ -392,9 +382,9 @@ export default function ObjectsPage() {
                   <TableHead className="text-xs font-semibold text-muted-foreground">Fəaliyyət</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground">Blok / Kvartal</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground">Sahə</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground">Qiymət</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground">Status / İcarəçi</TableHead>
-                  <TableHead className="w-24" />
+                  <TableHead className="text-xs font-semibold text-muted-foreground">Məbləğ / Qiymət</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground">Status / Sahibi</TableHead>
+                  <TableHead className="w-32 text-right pr-5">Əməliyyat</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -440,7 +430,24 @@ export default function ObjectsPage() {
                       <span className="text-sm font-medium text-foreground">{formatArea(obj.area)}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-semibold text-primary">{formatCurrency(obj.salePrice)}</span>
+                      {obj.status === "sold" ? (
+                        <div>
+                          <span className="text-sm font-bold text-rose-700">
+                            {formatCurrency(obj.soldPrice || obj.salePrice)}
+                          </span>
+                          {obj.buyerName && (
+                            <p className="text-[11px] text-muted-foreground truncate max-w-[130px]">{obj.buyerName}</p>
+                          )}
+                        </div>
+                      ) : obj.status === "rented" ? (
+                        <div>
+                          <span className="text-sm font-semibold text-indigo-700">
+                            {obj.monthlyAmount ? `${formatCurrency(obj.monthlyAmount)} / ay` : "İcarədə"}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Razılaşma ilə</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
@@ -462,16 +469,37 @@ export default function ObjectsPage() {
                             )}
                           </div>
                         )}
+                        {obj.status === "sold" && (obj.contractNumber || obj.qaimeNumber) && (
+                          <div className="text-[10px] text-muted-foreground">
+                            {obj.contractNumber && <span>Müqav: {obj.contractNumber}</span>}
+                            {obj.qaimeNumber && <span className="ml-1.5">Qaimə: {obj.qaimeNumber}</span>}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        {obj.status === "available" && (
+                    <TableCell className="pr-5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {obj.status === "sold" && obj.saleId && (
                           <Button size="sm" variant="outline"
-                            className="h-7 px-2.5 text-xs rounded-lg border-indigo-200 text-indigo-700 hover:bg-indigo-50 gap-1"
-                            onClick={() => openRent(obj)}>
-                            <KeyRound className="w-3 h-3" /> İcarə
+                            className="h-7 px-2 text-xs rounded-lg border-primary/30 text-primary hover:bg-primary/10 gap-1"
+                            onClick={() => setContractSaleId(obj.saleId)}>
+                            <FileText className="w-3 h-3" /> Müqavilə
                           </Button>
+                        )}
+                        {obj.status === "available" && (
+                          <>
+                            <Link href="/sales/create">
+                              <Button size="sm" variant="outline"
+                                className="h-7 px-2 text-xs rounded-lg border-rose-200 text-rose-700 hover:bg-rose-50 gap-1">
+                                Satış
+                              </Button>
+                            </Link>
+                            <Button size="sm" variant="outline"
+                              className="h-7 px-2 text-xs rounded-lg border-indigo-200 text-indigo-700 hover:bg-indigo-50 gap-1"
+                              onClick={() => openRent(obj)}>
+                              <KeyRound className="w-3 h-3" /> İcarə
+                            </Button>
+                          </>
                         )}
                         {obj.status === "rented" && (
                           <Link href="/renters">
@@ -484,7 +512,7 @@ export default function ObjectsPage() {
                         {isAdmin && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-50 hover:opacity-100">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-60 hover:opacity-100">
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -517,6 +545,13 @@ export default function ObjectsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Contract Print / Download Dialog ── */}
+      <ContractDialog
+        saleId={contractSaleId}
+        open={!!contractSaleId}
+        onOpenChange={(v) => !v && setContractSaleId(null)}
+      />
 
       {/* ── Bulk Creation Dialog ── */}
       <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
